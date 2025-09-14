@@ -18,7 +18,7 @@ jobs:
     - name: Set up Go
       uses: actions/setup-go@v4
       with:
-        go-version: '1.21'  # Change to your Go version
+        go-version: '1.21'  
 
     - name: Run tests
-      run: go test -v ./...
+      run: cd grlimit && go test -v ./...
