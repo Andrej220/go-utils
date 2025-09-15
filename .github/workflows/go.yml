@@ -7,7 +7,7 @@ on:
     branches: [ main, master ]
 
 jobs:
-  test:
+  test_grlimit:
     name: Run Tests
     runs-on: ubuntu-latest
     
@@ -23,3 +23,20 @@ jobs:
 
     - name: Run tests
       run: cd grlimit && go test -v ./...
+  
+  test_zlog:
+    name: Run Tests
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Go
+      uses: actions/setup-go@v4
+      with:
+        go-version: '1.21'  
+        cache: false
+
+    - name: Run tests
+      run: cd zlog && go test -v ./...
