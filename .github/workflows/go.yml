@@ -1,42 +1,22 @@
 name: Go Tests
-
 on:
-  push:
-    branches: [ main, master ]
-  pull_request:
-    branches: [ main, master ]
+  push: { branches: [main] }
+  pull_request: { branches: [main] }
 
 jobs:
-  test_grlimit:
-    name: Run Tests
+  test:
     runs-on: ubuntu-latest
-    
+    strategy:
+      matrix:
+        pkg: [grlimit, zlog]
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
-
-    - name: Set up Go
-      uses: actions/setup-go@v4
-      with:
-        go-version: '1.21'  
-        cache: false
-
-    - name: Run tests
-      run: cd grlimit && go test -v ./...
-  
-  test_zlog:
-    name: Run Tests
-    runs-on: ubuntu-latest
-    
-    steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
-
-    - name: Set up Go
-      uses: actions/setup-go@v4
-      with:
-        go-version: '1.21'  
-        cache: false
-
-    - name: Run tests
-      run: cd zlog && go test -v ./...
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.21'
+          cache: false
+          cache-dependency-path: |
+            **/go.sum
+      - name: Run tests
+        working-directory: ${{ matrix.pkg }}
+        run: go test -v -race -cover ./...
