@@ -61,8 +61,7 @@ func FormatFromEnv(defaultFormat string) string {
     }
     return defaultFormat
 }
-// NewLogger builds a zap-based ZLogger based on cfg.
-// It configures encoding, level, sampling, and initial fields.
+
 func New(cfg *Config) ZLogger {
     var baseCfg zap.Config
 
@@ -79,7 +78,7 @@ func New(cfg *Config) ZLogger {
     }
     
     // Allow console or JSON output
-    baseCfg.Encoding = FormatFromEnv(cfg.Format) // json or console ref zap logger
+    baseCfg.Encoding = FormatFromEnv(cfg.Format) 
     baseCfg.EncoderConfig.TimeKey = "timestamp"
     baseCfg.EncoderConfig.EncodeTime = zapcore.RFC3339TimeEncoder
     baseCfg.InitialFields = map[string]any{"service": cfg.ServiceName}
@@ -165,15 +164,17 @@ func (d defaultLogger) Warn(msg string, fields ...Field){
 
 
 func flatten(fields ...zapcore.Field) string {
+    // assert types
     enc := zapcore.NewMapObjectEncoder()
-    var b strings.Builder    
-    // assert types 
 	for _, f := range fields { f.AddTo(enc) }
 
+    if len(enc.Fields) == 0 { return "" }
+
+    pairs := make([]string, 0, len(fields))
     for k, v := range enc.Fields { 
-        fmt.Fprintf(&b, "%s=%v", k, v)
+        pairs = append( pairs, fmt.Sprintf("%s=%v", k, v) )
     }
-	return b.String()
+    return strings.Join(pairs, ", ")
 }
 
 // context key type for carrying ZLogger
