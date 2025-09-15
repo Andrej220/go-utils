@@ -17,7 +17,7 @@ const(
     ZLoggerConsoleFormat = "console"
 )
 
-// Field is a structured log field, aliasing zapcore.Field for flexibility.
+// Field is a structured log field, aliasing zapcore.Field 
 type Field = zapcore.Field
 
 func Any(key string, value any) Field         { return zap.Any(key, value) }
@@ -163,17 +163,10 @@ func (d defaultLogger) Warn(msg string, fields ...Field){
     log.Println("WARN:", msg, flatten(all...))
 }
 
-//func _flatten(fields ...zapcore.Field) string {
-//	enc := zapcore.NewConsoleEncoder(zapcore.EncoderConfig{ConsoleSeparator: " "})
-//	buf, _ := enc.EncodeEntry(zapcore.Entry{}, fields)
-//	defer buf.Free()
-//	return strings.TrimSpace(buf.String())
-//}
 
 func flatten(fields ...zapcore.Field) string {
     enc := zapcore.NewMapObjectEncoder()
-    var b strings.Builder
-
+    var b strings.Builder    
     // assert types 
 	for _, f := range fields { f.AddTo(enc) }
 
@@ -208,3 +201,10 @@ func (noopLogger) Warn(msg string, _ ...Field) {}
 func (noopLogger) With(_ ...Field) ZLogger { return noopLogger{} }
 func (noopLogger) Sync() error { return nil }
 var Discard ZLogger = noopLogger{}
+
+//func _flatten(fields ...zapcore.Field) string {
+//	enc := zapcore.NewConsoleEncoder(zapcore.EncoderConfig{ConsoleSeparator: " "})
+//	buf, _ := enc.EncodeEntry(zapcore.Entry{}, fields)
+//	defer buf.Free()
+//	return strings.TrimSpace(buf.String())
+//}
