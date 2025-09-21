@@ -6,7 +6,59 @@ import (
 	"testing"
 	"log"
 	"bytes"
+    "go.uber.org/zap/zapcore"
 )
+
+func TestStdLoggerAt_DefaultBackend_RoutesToError(t *testing.T) {
+    var buf bytes.Buffer
+    oldOut, oldFlags := log.Writer(), log.Flags()
+    log.SetOutput(&buf)
+    log.SetFlags(0)
+    defer func() { log.SetOutput(oldOut); log.SetFlags(oldFlags) }()
+
+    var d defaultLogger
+    std := StdLoggerAt(d, zapcore.ErrorLevel)
+
+    std.Println("boom")
+
+    out := buf.String()
+    if !strings.Contains(out, "ERROR: boom") {
+        t.Fatalf("stdlog adapter did not route to defaultLogger.Error; got: %q", out)
+    }
+}
+
+func TestStdLoggerAt_ZapBackend_NoPanic(t *testing.T) {
+    lg := New(&Config{
+        ServiceName: "test-service",
+        Debug:       false,
+        Format:      ZLoggerJsonFormat,
+    }) 
+
+    std := StdLoggerAt(lg, zapcore.ErrorLevel)
+    if std == nil {
+        t.Fatal("StdLoggerAt returned nil *log.Logger for zap backend")
+    }
+
+    std.Println("zap stdlog bridge smoke test")
+}
+
+func TestStdLoggerAt_DefaultBackend_RoutesToWarn(t *testing.T) {
+    var buf bytes.Buffer
+    oldOut, oldFlags := log.Writer(), log.Flags()
+    log.SetOutput(&buf)
+    log.SetFlags(0)
+    defer func() { log.SetOutput(oldOut); log.SetFlags(oldFlags) }()
+
+    var d defaultLogger
+    std := StdLoggerAt(d, zapcore.WarnLevel)
+
+    std.Println("heads up")
+
+    out := buf.String()
+    if !strings.Contains(out, "WARN: heads up") {
+        t.Fatalf("expected WARN routing; got: %q", out)
+    }
+}
 
 func TestNew_ProductionConfig(t *testing.T) {
     cfg := &Config{
