@@ -1,4 +1,4 @@
-module github.com/Andrej220/go-utils/serverutil
+module github.com/Andrej220/go-utils/httpsrv
 
 go 1.23
 
