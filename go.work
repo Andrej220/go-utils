@@ -3,6 +3,7 @@ go 1.23.6
 use (
 	./backoff
 	./grlimit
+	./httpsrv
 	./wpool
 	./zlog
 )
