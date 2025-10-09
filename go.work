@@ -6,4 +6,5 @@ use (
 	./httpsrv
 	./wpool
 	./zlog
+	./autostr
 )
