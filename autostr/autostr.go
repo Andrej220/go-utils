@@ -1,5 +1,3 @@
-package autostr
-
 // Tag-based struct-to-string conversion.
 //
 // The autostr package provides a reflection-based utility to convert Go structs into human-readable strings using struct tags.
@@ -13,6 +11,7 @@ package autostr
 //   }
 //   p := Person{Name: "Alice", Age: 30}
 //   fmt.Println(autostr.String(p)) // Output: FullName: Alice, Age: 30 years
+package autostr
 
 import (
 	"fmt"
