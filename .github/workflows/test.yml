@@ -29,7 +29,9 @@ jobs:
 
       - name: Run tests
         working-directory: ${{ matrix.pkg }}
-        run: go test -v -race -covermode=atomic -coverprofile=../.coverage/${{ matrix.pkg }}.out ./...
+        run: |
+          mkdir -p ../.coverage
+          go test -v -race -covermode=atomic -coverprofile=../.coverage/${{ matrix.pkg }}.out ./...
       
       - name: Upload coverage
         uses: actions/upload-artifact@v4
