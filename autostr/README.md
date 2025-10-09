@@ -22,7 +22,18 @@ It’s designed for logging, debugging, and CLI output when you want control ove
 
 ---
 
+## Example
+```Bash
+type Person struct {
+    Name string `string:"include" display:"FullName"`
+    Age  int    `string:"include"`
+    ID   int    // excluded
+}
+p := Person{Name: "Alice", Age: 30}
+fmt.Println(autostr.String(p)) // Output: FullName: Alice, Age: 30
+```
+---
 ## 📦 Installation
 
 ```bash
-go get github.com/azargarov/autostr
+go get github.com/azargarov/go-utils/autostr

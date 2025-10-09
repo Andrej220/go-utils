@@ -11,6 +11,11 @@ type Person struct {
 	Age  int    `string:"include"`
 }
 
+type Car struct{
+	Make 	string `string:"include"`
+	Price	float32 `string:"include" format:"%.2f"`
+}
+
 type Outer struct {
 	Person Person `string:"include"`
 	Note   string `string:"include"`
@@ -117,6 +122,13 @@ func Test_FieldDisplayNameTag(t *testing.T) {
 	}
 }
 
+func Test_FormatTag(t *testing.T) {
+	p := Car{Make: "Opel", Price: 2.20}
+	got := autostr.String(p, autostr.DefaultConfig())
+	if got[19:] != "2.20" {
+		t.Fatalf("display tag not applied: %q", got)
+	}
+}
 func Test_ZeroValueConfig_FillsDefaults(t *testing.T) {
 	// Users can pass zero-value Config and expect defaults to apply
 	cfg := autostr.Config{}

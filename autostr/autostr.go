@@ -1,14 +1,18 @@
 package autostr
 
-// tag-based struct-to-string conversion
+// Tag-based struct-to-string conversion.
+//
+// The autostr package provides a reflection-based utility to convert Go structs into human-readable strings using struct tags.
+// It is designed for logging, debugging, and CLI output, offering flexible configuration for field inclusion, naming, formatting, and separators.
+// If a type implements the AutoStringer interface, its AutoString method is used instead of reflection-based conversion.
 //
 // Example:
 //   type Person struct {
-//       Name string `string:"include"`
-//       Age  int    `string:"include"`
+//       Name string `string:"include" display:"FullName" format:"%s"`
+//       Age  int    `string:"include" format:"%d years"`
 //   }
 //   p := Person{Name: "Alice", Age: 30}
-//   fmt.Println(autostr.String(p)) // Name: Alice, Age: 30
+//   fmt.Println(autostr.String(p)) // Output: FullName: Alice, Age: 30 years
 
 import (
 	"fmt"
@@ -16,29 +20,63 @@ import (
 	"strings"
 )
 
+// AutoStringer defines an interface for types that provide their own string representation.
+// Types implementing AutoStringer will use their AutoString method instead of reflection-based conversion.
 type AutoStringer interface {
 	AutoString() string
 }
 
+// Constants defining default values for configuration.
 const (
-    DefaultIncludeTag          = "string"
-    DefaultIncludeValue        = "include"
-    DefaultFieldNameTag        = "display"
-    DefaultSeparator           = ", "
-    DefaultFieldValueSeparator = ": "
+	// DefaultIncludeTag is the default struct tag key for including fields in the string output.
+	DefaultIncludeTag = "string"
+	// DefaultIncludeValue is the default tag value that indicates a field should be included.
+	DefaultIncludeValue = "include"
+	// DefaultFieldNameTag is the default struct tag key for renaming fields in the output.
+	DefaultFieldNameTag = "display"
+	// DefaultSeparator is the default separator between fields in the output.
+	DefaultSeparator = ", "
+	// DefaultFieldValueSeparator is the default separator between field names and their values.
+	DefaultFieldValueSeparator = ": "
+	// DefaultShowZeroValue determines whether zero values are included by default.
+	DefaultShowZeroValue = true
+	// DefaultFormat is the default format string for field values when no format tag is specified.
+	DefaultFormat = "%v"
+	// DefaultFormatTag is the default struct tag key for specifying field value formats.
+	DefaultFormatTag = "format"
 )
 
+// Config defines options for customizing the string conversion process.
 type Config struct {
-	IncludeTag           string // struct tag to include fields (default: "string")
-	IncludeValue         string // tag value that includes field (default: "include")
-	FieldNameTag		 string // struct tag to rename field
-	FieldValueSeparator *string // separator between Field and Value (default: ": ")
-	Separator           *string // field separator (default: ", ")
-	ShowZeroValue        bool   // whether to show zero values (default: false)
+	IncludeTag           string  // IncludeTag specifies the struct tag key for including fields (default: "string").
+	IncludeValue         string  // IncludeValue specifies the tag value that includes a field (default: "include").
+	FieldNameTag         string  // FieldNameTag specifies the struct tag key for renaming fields (default: "display").
+	FieldValueSeparator  *string // FieldValueSeparator is the separator between field names and values (default: ": ").
+	Separator            *string // Separator is the separator between fields (default: ", ").
+	ShowZeroValue        bool    // ShowZeroValue determines whether zero-value fields are included (default: true).
+	FormatTag            string  // FormatTag specifies the struct tag key for formatting field values (default: "format").
 }
 
+// Ptr creates a pointer to a value of any type.
+// It is a helper function for setting pointer-based fields in Config, such as Separator or FieldValueSeparator.
+//
+// Example:
+//   cfg := Config{Separator: Ptr(":")} // Sets Separator to ":"
 func Ptr[T any](v T) *T { return &v }
 
+// DefaultConfig returns a Config with default values for struct-to-string conversion.
+// The defaults are:
+//   - IncludeTag: "string"
+//   - IncludeValue: "include"
+//   - FieldNameTag: "display"
+//   - Separator: ", "
+//   - FieldValueSeparator: ": "
+//   - ShowZeroValue: true
+//   - FormatTag: "format"
+//
+// Example:
+//   cfg := DefaultConfig()
+//   fmt.Println(String(Person{Name: "Alice", Age: 30}, cfg)) // Output: Name: Alice, Age: 30
 func DefaultConfig() Config {
 	return Config{
         IncludeTag:          DefaultIncludeTag,
@@ -46,10 +84,13 @@ func DefaultConfig() Config {
         FieldNameTag:        DefaultFieldNameTag,
         Separator:           Ptr(DefaultSeparator),
         FieldValueSeparator: Ptr(DefaultFieldValueSeparator),
-        ShowZeroValue:       false,
+        ShowZeroValue:       DefaultShowZeroValue,
+		FormatTag:  	     DefaultFormatTag,
 	}
 }
 
+// ensureDefaults sets default values for unset Config fields.
+// It is an internal helper function and not intended for public use.
 func ensureDefaults(cfg *Config) {
     if cfg.IncludeTag == "" {
         cfg.IncludeTag = DefaultIncludeTag
@@ -62,14 +103,27 @@ func ensureDefaults(cfg *Config) {
     }
     if cfg.Separator == nil {
         cfg.Separator = Ptr(DefaultSeparator)
+    }    
+	if cfg.FormatTag == "" {
+        cfg.FormatTag = DefaultFormatTag
     }
     if cfg.FieldValueSeparator == nil {
         cfg.FieldValueSeparator = Ptr(DefaultFieldValueSeparator)
     }
 }
 
-// String renders any value to string using struct tags and Config.
-// If the value (or *value) implements AutoString, that is used instead.
+// String converts a value to a human-readable string using struct tags and an optional Config.
+// If the value (or its pointer) implements AutoStringer, its AutoString method is used.
+// If no Config is provided, DefaultConfig is used.
+// The function handles nested structs, pointers, interfaces, and cyclic references safely.
+//
+// Example:
+//   type Person struct {
+//       Name string `string:"include" display:"FullName" format:"%s"`
+//       Age  int    `string:"include" format:"%d years"`
+//   }
+//   p := Person{Name: "Alice", Age: 30}
+//   fmt.Println(String(p)) // Output: FullName: Alice, Age: 30 years
 func String(obj any, config ...Config) string {
 	cfg := DefaultConfig()
 	if len(config) > 0 {
@@ -94,6 +148,8 @@ func String(obj any, config ...Config) string {
 	return stringifyValue(reflect.ValueOf(obj), cfg, visited)
 }
 
+// stringifyValue converts a reflect.Value to a string based on the provided Config and visited pointers.
+// It is an internal helper function and not intended for public use.
 func stringifyValue(v reflect.Value, cfg Config, visited map[uintptr]bool) string {
 	if !v.IsValid() {
 		return "<nil>"
@@ -155,12 +211,14 @@ func stringifyValue(v reflect.Value, cfg Config, visited map[uintptr]bool) strin
 		}
 		sb.WriteString(displayName)
 		sb.WriteString(kv)
-		sb.WriteString(formatValueWithVisited(field, cfg, visited))
+		sb.WriteString(formatValueWithVisited(field, ft.Tag.Get(cfg.FormatTag), cfg ,visited))
 	}
 	return sb.String()
 }
 
-func formatValueWithVisited(field reflect.Value, cfg Config, visited map[uintptr]bool) string {
+// formatValueWithVisited formats a reflect.Value using the specified format string, Config, and visited pointers.
+// It is an internal helper function and not intended for public use.
+func formatValueWithVisited(field reflect.Value, format string ,cfg Config, visited map[uintptr]bool) string {
 	switch field.Kind() {
 	case reflect.Interface, reflect.Pointer:
 		return stringifyValue(field, cfg, visited)
@@ -169,9 +227,14 @@ func formatValueWithVisited(field reflect.Value, cfg Config, visited map[uintptr
 			return stringifyValue(field, cfg, visited)
 		}
 	}
-	return fmt.Sprintf("%v", field.Interface())
+	if format ==""{
+		format = DefaultFormat
+	}
+	return fmt.Sprintf(format, field.Interface())
 }
 
+// isZeroValue checks if a reflect.Value represents a zero value for its type.
+// It is an internal helper function and not intended for public use.
 func isZeroValue(field reflect.Value) bool {
 	switch field.Kind() {
 	case reflect.String:
@@ -183,6 +246,8 @@ func isZeroValue(field reflect.Value) bool {
 	}
 }
 
+// hasAutoStringTags checks if a struct value has any fields with the include tag specified in Config.
+// It is an internal helper function and not intended for public use.
 func hasAutoStringTags(v reflect.Value, cfg Config) bool {
 	t := v.Type()
 	for i := 0; i < v.NumField(); i++ {
