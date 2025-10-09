@@ -2,7 +2,7 @@
 
 
 [![Go Reference](https://pkg.go.dev/badge/github.com/azargarov/go-utils/autostr.svg)](https://pkg.go.dev/github.com/azargarov/go-utils/autostr)
-[![CI](https://github.com/azargarov/go-utils/actions/workflows/ci.yml/badge.svg)](https://github.com/azargarov/go-utils/actions/workflows/test.yml)
+[![CI](https://github.com/azargarov/go-utils/actions/workflows/ci.yml/badge.svg)](https://github.com/azargarov/go-utils/actions/workflows/ci.yml)
 [![Go Report Card](https://goreportcard.com/badge/github.com/azargarov/go-utils/autostr)](https://goreportcard.com/report/github.com/azargarov/go-utils/autostr)
 
 
