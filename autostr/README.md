@@ -1,4 +1,4 @@
-# autostr 🧩 — Tag-based struct-to-string converter for Go
+# autostr  — Tag-based struct-to-string converter for Go
 
 
 [![Go Reference](https://pkg.go.dev/badge/github.com/azargarov/go-utils/autostr.svg)](https://pkg.go.dev/github.com/azargarov/go-utils/autostr)
@@ -12,7 +12,7 @@ It’s designed for logging, debugging, and CLI output when you want control ove
 
 ---
 
-## ✨ Features
+## Features
 
 - Tag-driven field inclusion (`string:"include"`)
 - Custom field labels via tag (`display:"Alias"`)
@@ -46,7 +46,7 @@ func main() {
 }
 ```
 ---
-## 📦 Installation
+## Installation
 
 ```bash
 go get github.com/azargarov/go-utils/autostr
