@@ -4,6 +4,12 @@ All notable changes to the `autostr` module will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.4] - 2025-10-09
+### Fixed
+- Docs and CI badge finalized; code formatted with `gofmt -s`.
+### Maintenance
+- Retracted versions [0.1.0–0.1.3] due to earlier force-moved tag and docs cleanup. Use 0.1.4+.
+
 ## [0.1.1] - 2025-10-09
 
 ### Added
