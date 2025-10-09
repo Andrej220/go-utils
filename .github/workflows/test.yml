@@ -1,0 +1,39 @@
+#https://docs.github.com/en/actions/tutorials/build-and-test-code/go
+name: Go Tests
+on:
+  push: { branches: [main] }
+  pull_request: { branches: [main] }
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        go: [ '1.22.x', '1.23.x' ]
+        pkg: [grlimit, zlog, backoff, wpool, httpsrv, autostr]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version:  ${{ matrix.go }}
+          cache: true
+          cache-dependency-path: |
+            **/go.sum
+
+      - name: Go env (debug)
+        run: go env
+
+      - name: Vet
+        working-directory: ${{ matrix.pkg }}
+        run: go vet ./...
+
+      - name: Run tests
+        working-directory: ${{ matrix.pkg }}
+        run: go test -v -race -covermode=atomic -coverprofile=../.coverage/${{ matrix.pkg }}.out ./...
+      
+      - name: Upload coverage
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-${{ matrix.go }}
+          path: .coverage/*.out
+          if-no-files-found: ignore
