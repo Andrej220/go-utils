@@ -9,7 +9,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        go: [ '1.22.x', '1.23.x' ]
+        go: [  '1.23.x' ]
         pkg: [grlimit, zlog, backoff, wpool, httpsrv, autostr]
     steps:
       - uses: actions/checkout@v4
