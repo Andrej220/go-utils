@@ -1,11 +1,12 @@
 #https://docs.github.com/en/actions/tutorials/build-and-test-code/go
 name: Go Tests
 on:
-  push: { branches: [main] }
+  push: { branches: [main], tags: ['*/v*.*.*'] }
   pull_request: { branches: [main] }
 
 jobs:
-  test:
+  test_all:
+    if: ${{ !startsWith(github.ref, 'refs/tags/') }}
     runs-on: ubuntu-latest
     strategy:
       matrix:
@@ -37,5 +38,45 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: coverage-${{ matrix.go }}
+          path: .coverage/*.out
+          if-no-files-found: ignore
+  
+  test_tag:
+    if: ${{ startsWith(github.ref, 'refs/tags/') }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        go: [ '1.23.x' ]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: ${{ matrix.go }}
+          cache: true
+          cache-dependency-path: |
+            **/go.sum
+
+      - name: Detect package from tag
+        id: tagpkg
+        run: |
+          # GITHUB_REF_NAME is like "autostr/v0.1.0"
+          PKG="${GITHUB_REF_NAME%%/*}"
+          echo "pkg=$PKG" >> "$GITHUB_OUTPUT"
+
+      - name: Vet (${{ steps.tagpkg.outputs.pkg }})
+        working-directory: ${{ steps.tagpkg.outputs.pkg }}
+        run: go vet ./...
+
+      - name: Test (race + coverage) (${{ steps.tagpkg.outputs.pkg }})
+        working-directory: ${{ steps.tagpkg.outputs.pkg }}
+        run: |
+          mkdir -p ../.coverage
+          go test -v -race -covermode=atomic -coverprofile=../.coverage/${{ steps.tagpkg.outputs.pkg }}.out ./...
+
+      - name: Upload coverage
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-tag-${{ matrix.go }}
           path: .coverage/*.out
           if-no-files-found: ignore
