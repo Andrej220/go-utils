@@ -1,0 +1,26 @@
+# Changelog
+
+All notable changes to the `autostr` module will be documented in this file.
+
+The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+
+## [0.1.1] - 2025-10-09
+
+### Added
+- Support for `format` tag to customize field value formatting (e.g., `format:"%03d"` for zero-padded integers).
+
+### Changed
+- Updated `DefaultShowZeroValue` to `true` to include zero-value fields by default.
+
+## [0.1.0] - 2025-09-08
+
+### Added
+- Initial release of `autostr`, a tag-based struct-to-string conversion library.
+- Support for converting structs to human-readable strings using `string:"include"` tags.
+- Custom field naming via `display` tags (e.g., `display:"FullName"`).
+- Configurable separators (`Separator`, `FieldValueSeparator`) and zero-value display (`ShowZeroValue`).
+- Support for the `AutoStringer` interface to override default string conversion.
+- Safe handling of cyclic references with `<cycle>` output.
+- Nested struct and pointer traversal.
+- Comprehensive test suite covering basic functionality, nested structs, cycles, and configuration.
+- CI/CD pipeline with GitHub Actions for testing, vetting, and code coverage.
