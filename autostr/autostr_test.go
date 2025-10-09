@@ -1,9 +1,9 @@
 package autostr_test
 
 import (
-	"testing"
-	"strings"
 	"github.com/azargarov/go-utils/autostr"
+	"strings"
+	"testing"
 )
 
 type Person struct {
@@ -11,9 +11,9 @@ type Person struct {
 	Age  int    `string:"include"`
 }
 
-type Car struct{
-	Make 	string `string:"include"`
-	Price	float32 `string:"include" format:"%.2f"`
+type Car struct {
+	Make  string  `string:"include"`
+	Price float32 `string:"include" format:"%.2f"`
 }
 
 type Outer struct {
