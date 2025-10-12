@@ -1,22 +1,32 @@
-#https://docs.github.com/en/actions/tutorials/build-and-test-code/go
+# https://docs.github.com/en/actions/tutorials/build-and-test-code/go
 name: Go Tests
+
 on:
-  push: { branches: [main], tags: ['*/v*.*.*'] }
-  pull_request: { branches: [main] }
+  push:
+    branches: [ main ]
+    tags: [ '*/v*.*.*' ]   # e.g. autostr/v0.1.0
+  pull_request:
+    branches: [ main ]
+
+permissions:
+  contents: read
+  id-token: write   
 
 jobs:
   test_all:
     if: ${{ !startsWith(github.ref, 'refs/tags/') }}
     runs-on: ubuntu-latest
     strategy:
+      fail-fast: false
       matrix:
-        go: [  '1.23.x' ]
-        pkg: [grlimit, zlog, backoff, wpool, httpsrv, autostr]
+        go: [ '1.23.x' ]
+        pkg: [ grlimit, zlog, backoff, wpool, httpsrv, autostr ]
     steps:
       - uses: actions/checkout@v4
+
       - uses: actions/setup-go@v5
         with:
-          go-version:  ${{ matrix.go }}
+          go-version: ${{ matrix.go }}
           cache: true
           cache-dependency-path: |
             **/go.sum
@@ -24,23 +34,39 @@ jobs:
       - name: Go env (debug)
         run: go env
 
-      - name: Vet
+      - name: Vet (${{ matrix.pkg }})
         working-directory: ${{ matrix.pkg }}
         run: go vet ./...
 
-      - name: Run tests
+      - name: Test (race + coverage) (${{ matrix.pkg }})
         working-directory: ${{ matrix.pkg }}
         run: |
           mkdir -p ../.coverage
-          go test -v -race -covermode=atomic -coverprofile=../.coverage/${{ matrix.pkg }}.out ./...
-      
-      - name: Upload coverage
+          if compgen -G '*_test.go' > /dev/null; then
+            go test -v -race -covermode=atomic -coverprofile=../.coverage/${{ matrix.pkg }}.out ./...
+          else
+            echo "No tests in $PWD — creating empty coverage profile"
+            echo "mode: atomic" > ../.coverage/${{ matrix.pkg }}.out
+          fi
+
+      - name: Show generated coverage files
+        run: ls -lah .coverage || true
+
+      - name: Upload coverage artifacts
+        if: ${{ hashFiles('.coverage/*.out') != '' }}
         uses: actions/upload-artifact@v4
         with:
-          name: coverage-${{ matrix.go }}
+          name: coverage-${{ matrix.go }}-${{ matrix.pkg }}
           path: .coverage/*.out
-          if-no-files-found: ignore
-  
+
+      - name: Upload coverage to Codecov
+        if: ${{ hashFiles('.coverage/*.out') != '' }}
+        uses: codecov/codecov-action@v4
+        with:
+          files: .coverage/*.out
+          flags: unittests,${{ matrix.pkg }}
+          fail_ci_if_error: false
+
   test_tag:
     if: ${{ startsWith(github.ref, 'refs/tags/') }}
     runs-on: ubuntu-latest
@@ -50,6 +76,7 @@ jobs:
         go: [ '1.23.x' ]
     steps:
       - uses: actions/checkout@v4
+
       - uses: actions/setup-go@v5
         with:
           go-version: ${{ matrix.go }}
@@ -62,6 +89,9 @@ jobs:
         run: |
           # GITHUB_REF_NAME is like "autostr/v0.1.0"
           PKG="${GITHUB_REF_NAME%%/*}"
+          if [ ! -d "$PKG" ]; then
+            echo "Tag prefix '$PKG' does not match a directory. Exiting."; exit 1
+          fi
           echo "pkg=$PKG" >> "$GITHUB_OUTPUT"
 
       - name: Vet (${{ steps.tagpkg.outputs.pkg }})
@@ -72,18 +102,27 @@ jobs:
         working-directory: ${{ steps.tagpkg.outputs.pkg }}
         run: |
           mkdir -p ../.coverage
-          go test -v -race -covermode=atomic -coverprofile=../.coverage/${{ steps.tagpkg.outputs.pkg }}.out ./...
+          if compgen -G '*_test.go' > /dev/null; then
+            go test -v -race -covermode=atomic -coverprofile=../.coverage/${{ steps.tagpkg.outputs.pkg }}.out ./...
+          else
+            echo "No tests in $PWD — creating empty coverage profile"
+            echo "mode: atomic" > ../.coverage/${{ steps.tagpkg.outputs.pkg }}.out
+          fi
 
-      - name: Upload coverage
+      - name: Show generated coverage files
+        run: ls -lah .coverage || true
+
+      - name: Upload coverage artifacts
+        if: ${{ hashFiles('.coverage/*.out') != '' }}
         uses: actions/upload-artifact@v4
         with:
           name: coverage-tag-${{ matrix.go }}
           path: .coverage/*.out
-          if-no-files-found: ignore
-          
+
       - name: Upload coverage to Codecov
+        if: ${{ hashFiles('.coverage/*.out') != '' }}
         uses: codecov/codecov-action@v4
         with:
           files: .coverage/*.out
-          flags: unittests
+          flags: unittests,tag
           fail_ci_if_error: false
