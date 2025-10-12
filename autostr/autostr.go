@@ -55,7 +55,7 @@ type Config struct {
 	Separator           *string // Separator is the separator between fields (default: ", ").
 	ShowZeroValue       bool    // ShowZeroValue determines whether zero-value fields are included (default: true).
 	FormatTag           string  // FormatTag specifies the struct tag key for formatting field values (default: "format").
-	PrettyPrint			bool    // print multiline values in a pretty way
+	PrettyPrint         bool    // print multiline values in a pretty way
 }
 
 // Ptr creates a pointer to a value of any type.
@@ -190,8 +190,8 @@ func stringifyValue(v reflect.Value, cfg Config, visited map[uintptr]bool) strin
 	kv := *cfg.FieldValueSeparator
 
 	var indent int
-	if cfg.PrettyPrint{
-		indent = measureKeyColumnWidth(v, cfg) 
+	if cfg.PrettyPrint {
+		indent = measureKeyColumnWidth(v, cfg)
 	}
 
 	for i := 0; i < v.NumField(); i++ {
@@ -220,10 +220,10 @@ func stringifyValue(v reflect.Value, cfg Config, visited map[uintptr]bool) strin
 		}
 		sb.WriteString(displayName)
 		val := formatValueWithVisited(field, ft.Tag.Get(cfg.FormatTag), cfg, visited)
-		if cfg.PrettyPrint{
-			pad := indent - len(displayName) 
-			val = formatValueAligned(val," ", kv , indent , pad )
-		} else{
+		if cfg.PrettyPrint {
+			pad := indent - len(displayName)
+			val = formatValueAligned(val, " ", kv, indent, pad)
+		} else {
 			sb.WriteString(kv)
 		}
 		sb.WriteString(val)
@@ -262,7 +262,7 @@ func formatValueAligned(val, indentChar, separator string, indent, pad int) stri
 	first := strings.Repeat(indentChar, pad) + separator + lines[0]
 	if len(lines) == 1 {
 		return first
-	}	
+	}
 
 	prefix := strings.Repeat(indentChar, indent) + separator
 	out := make([]string, 0, len(lines))
@@ -279,10 +279,12 @@ func formatValueAligned(val, indentChar, separator string, indent, pad int) stri
 // (2) are not zero when cfg.ShowZeroValue is false.
 // If a field has cfg.FieldNameTag, that value is used as the key; otherwise
 // the struct field name is used. Non-struct, nil, or unsupported values return 0.
-func measureKeyColumnWidth(v reflect.Value, cfg Config) int{
+func measureKeyColumnWidth(v reflect.Value, cfg Config) int {
 
 	for v.IsValid() && (v.Kind() == reflect.Ptr || v.Kind() == reflect.Interface) {
-		if v.IsNil() { return 0 }
+		if v.IsNil() {
+			return 0
+		}
 		v = v.Elem()
 	}
 	if !v.IsValid() || v.Kind() != reflect.Struct {

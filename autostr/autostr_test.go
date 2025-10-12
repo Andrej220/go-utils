@@ -1,9 +1,9 @@
 package autostr_test
 
 import (
+	"github.com/azargarov/go-utils/autostr"
 	"strings"
 	"testing"
-	"github.com/azargarov/go-utils/autostr"
 )
 
 type Person struct {
@@ -170,8 +170,8 @@ func Test_PrettyPrint_WidthIgnoresZeroWhenShowZeroFalse(t *testing.T) {
 		Short    string `string:"include" display:"K"`
 	}
 	v := S{
-		LongZero: "",     // zero-value, should be omitted
-		Short:    "val",  // only field shown
+		LongZero: "",    // zero-value, should be omitted
+		Short:    "val", // only field shown
 	}
 
 	cfg := autostr.DefaultConfig()
@@ -189,27 +189,28 @@ func Test_PrettyPrint_WidthIgnoresZeroWhenShowZeroFalse(t *testing.T) {
 
 // Ensures PrettyPrint plays nicely with custom separators.
 func Test_PrettyPrint_CustomSeparators_Newline(t *testing.T) {
-    type P struct {
-        A string `string:"include" display:"A"`
-        B string `string:"include" display:"BBB"`
-    }
-    v := P{A: "x", B: "y\nz"}
+	type P struct {
+		A string `string:"include" display:"A"`
+		B string `string:"include" display:"BBB"`
+	}
+	v := P{A: "x", B: "y\nz"}
 
-    cfg := autostr.DefaultConfig()
-    cfg.PrettyPrint = true
-    cfg.Separator = autostr.Ptr("\n")
-    cfg.FieldValueSeparator = autostr.Ptr(" : ")
+	cfg := autostr.DefaultConfig()
+	cfg.PrettyPrint = true
+	cfg.Separator = autostr.Ptr("\n")
+	cfg.FieldValueSeparator = autostr.Ptr(" : ")
 
-    // indent = 3; colon column aligns across all lines:
-    // "A"   -> pad=2 + " : "  => "A   : x"
-    // "BBB" -> pad=0 + " : "  => "BBB : y"
-    // cont  -> indent(3) + " : " => "    : z" (4 spaces before ':')
-    want := "A   : x\nBBB : y\n    : z"
-    got := autostr.String(v, cfg)
-    if got != want {
-        t.Fatalf("PrettyPrint with custom separators mismatch.\nGot:\n%q\nWant:\n%q", got, want)
-    }
+	// indent = 3; colon column aligns across all lines:
+	// "A"   -> pad=2 + " : "  => "A   : x"
+	// "BBB" -> pad=0 + " : "  => "BBB : y"
+	// cont  -> indent(3) + " : " => "    : z" (4 spaces before ':')
+	want := "A   : x\nBBB : y\n    : z"
+	got := autostr.String(v, cfg)
+	if got != want {
+		t.Fatalf("PrettyPrint with custom separators mismatch.\nGot:\n%q\nWant:\n%q", got, want)
+	}
 }
+
 // Ensures PrettyPrint plays nicely with custom separators.
 func Test_PrettyPrint_PipeSeparators(t *testing.T) {
 	type P struct {
@@ -230,7 +231,7 @@ func Test_PrettyPrint_PipeSeparators(t *testing.T) {
 	}
 }
 
-//  helpers 
+// helpers
 func containsAll(s string, parts []string) bool {
 	for _, p := range parts {
 		if !strings.Contains(s, p) {
