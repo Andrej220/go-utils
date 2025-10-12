@@ -55,6 +55,7 @@ type Config struct {
 	Separator           *string // Separator is the separator between fields (default: ", ").
 	ShowZeroValue       bool    // ShowZeroValue determines whether zero-value fields are included (default: true).
 	FormatTag           string  // FormatTag specifies the struct tag key for formatting field values (default: "format").
+	PrettyPrint			bool    // print multiline values in a pretty way
 }
 
 // Ptr creates a pointer to a value of any type.
@@ -188,6 +189,11 @@ func stringifyValue(v reflect.Value, cfg Config, visited map[uintptr]bool) strin
 	sep := *cfg.Separator
 	kv := *cfg.FieldValueSeparator
 
+	var indent int
+	if cfg.PrettyPrint{
+		indent = measureKeyColumnWidth(v, cfg) 
+	}
+
 	for i := 0; i < v.NumField(); i++ {
 		field := v.Field(i)
 		ft := t.Field(i)
@@ -213,10 +219,101 @@ func stringifyValue(v reflect.Value, cfg Config, visited map[uintptr]bool) strin
 			displayName = ft.Name
 		}
 		sb.WriteString(displayName)
-		sb.WriteString(kv)
-		sb.WriteString(formatValueWithVisited(field, ft.Tag.Get(cfg.FormatTag), cfg, visited))
+		val := formatValueWithVisited(field, ft.Tag.Get(cfg.FormatTag), cfg, visited)
+		if cfg.PrettyPrint{
+			pad := indent - len(displayName) 
+			val = formatValueAligned(val," ", kv , indent , pad )
+		} else{
+			sb.WriteString(kv)
+		}
+		sb.WriteString(val)
 	}
 	return sb.String()
+}
+
+// formatValueAligned formats a value string so that its first line follows a
+// key/column and its subsequent lines align under the value column.
+//   - The first line is rendered as: strings.Repeat(indentChar, pad) + separator + firstLine
+//   - Each following line is rendered as: strings.Repeat(indentChar, indent) + separator + line
+//
+// The function normalizes Windows newlines ("\r\n" → "\n") and trims only
+// trailing '\n' from val. If val is empty, it returns an empty string.
+// Parameters:
+//   - val: the raw value text (may be multi-line).
+//   - indentChar: the single-character string used for indentation (e.g., " ").
+//   - separator: the string placed between key and value (e.g., ": " or "\t\t").
+//   - indent: the total indent (in indentChar units) used for subsequent lines
+//     (typically the maximum key width).
+//   - pad: extra left padding (in indentChar units) applied before separator on
+//     the first line (typically indent - len(key); negative values are treated as 0).
+//
+// Note: This function only formats the value portion; callers should write the key
+// text before calling this function.
+func formatValueAligned(val, indentChar, separator string, indent, pad int) string {
+	if val == "" {
+		return ""
+	}
+	if pad < 0 {
+		pad = 0
+	}
+	val = strings.ReplaceAll(val, "\r\n", "\n")
+	val = strings.Trim(val, "\n")
+	lines := strings.Split(val, "\n")
+	first := strings.Repeat(indentChar, pad) + separator + lines[0]
+	if len(lines) == 1 {
+		return first
+	}	
+
+	prefix := strings.Repeat(indentChar, indent) + separator
+	out := make([]string, 0, len(lines))
+	out = append(out, first)
+	for _, ln := range lines[1:] {
+		out = append(out, prefix+ln)
+	}
+	return strings.Join(out, "\n")
+}
+
+// measureKeyColumnWidth returns the maximum printable key width for v,
+// considering autostr rules. It inspects only exported struct fields that
+// (1) are tagged with cfg.IncludeTag=cfg.IncludeValue and
+// (2) are not zero when cfg.ShowZeroValue is false.
+// If a field has cfg.FieldNameTag, that value is used as the key; otherwise
+// the struct field name is used. Non-struct, nil, or unsupported values return 0.
+func measureKeyColumnWidth(v reflect.Value, cfg Config) int{
+
+	for v.IsValid() && (v.Kind() == reflect.Ptr || v.Kind() == reflect.Interface) {
+		if v.IsNil() { return 0 }
+		v = v.Elem()
+	}
+	if !v.IsValid() || v.Kind() != reflect.Struct {
+		return 0
+	}
+
+	max := 0
+	t := v.Type()
+	for i := 0; i < t.NumField(); i++ {
+		ft := t.Field(i)
+		fv := v.Field(i)
+
+		if !fv.CanInterface() {
+			continue
+		}
+		if ft.Tag.Get(cfg.IncludeTag) != cfg.IncludeValue {
+			continue
+		}
+		if !cfg.ShowZeroValue && isZeroValue(fv) {
+			continue
+		}
+
+		name := ft.Tag.Get(cfg.FieldNameTag)
+		if name == "" {
+			name = ft.Name
+		}
+		if n := len(name); n > max {
+			max = n
+		}
+	}
+	return max
 }
 
 // formatValueWithVisited formats a reflect.Value using the specified format string, Config, and visited pointers.

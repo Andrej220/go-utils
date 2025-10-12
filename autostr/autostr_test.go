@@ -1,9 +1,9 @@
 package autostr_test
 
 import (
-	"github.com/azargarov/go-utils/autostr"
 	"strings"
 	"testing"
+	"github.com/azargarov/go-utils/autostr"
 )
 
 type Person struct {
@@ -47,8 +47,6 @@ func Test_Nested_WithTags(t *testing.T) {
 		Note:   "n1",
 	}
 	got := autostr.String(o)
-	// Person has tagged fields; Outer prints Person using tags too.
-	// Order is struct field order.
 	want := "Person: FullName: Bob, Age: 40, Note: n1"
 	if got != want {
 		t.Fatalf("got %q, want %q", got, want)
@@ -73,7 +71,6 @@ func Test_ShowZeroValue(t *testing.T) {
 	cfg := autostr.DefaultConfig()
 	cfg.ShowZeroValue = true
 	got := autostr.String(p, cfg)
-	// Zero values included because ShowZeroValue=true
 	want := "FullName: , Age: 0"
 	if got != want {
 		t.Fatalf("got %q, want %q", got, want)
@@ -89,7 +86,6 @@ func Test_NilInterface_IsHandled(t *testing.T) {
 }
 
 func Test_PointerReceiver_AutoString_Detected(t *testing.T) {
-	// value receiver path should detect pointer AutoString via reflect.New trick
 	got1 := autostr.String(WithAuto{X: 1})
 	got2 := autostr.String(&WithAuto{X: 1})
 	if got1 != "WithAuto<X>" || got2 != "WithAuto<X>" {
@@ -101,11 +97,9 @@ func Test_Cycle_Detected(t *testing.T) {
 	a := &WithPtr{V: 1}
 	b := &WithPtr{V: 2}
 	a.Next = b
-	b.Next = a // cycle
+	b.Next = a
 
 	got := autostr.String(a)
-	// Next is included, but cycles collapse to <cycle>
-	// Exact formatting depends on field order
 	if got == "" || got == "<nil>" || got == "V: 1" {
 		t.Fatalf("unexpected cycle handling: %q", got)
 	}
@@ -125,19 +119,118 @@ func Test_FieldDisplayNameTag(t *testing.T) {
 func Test_FormatTag(t *testing.T) {
 	p := Car{Make: "Opel", Price: 2.20}
 	got := autostr.String(p, autostr.DefaultConfig())
-	if got[19:] != "2.20" {
-		t.Fatalf("display tag not applied: %q", got)
+	// "Make: Opel, Price: 2.20" -> the value starts at index 19
+	if len(got) < 23 || got[19:] != "2.20" {
+		t.Fatalf("format tag not applied correctly, got %q", got)
 	}
 }
+
 func Test_ZeroValueConfig_FillsDefaults(t *testing.T) {
-	// Users can pass zero-value Config and expect defaults to apply
-	cfg := autostr.Config{}
+	cfg := autostr.Config{} // zero-value config; ensureDefaults should fill most defaults
 	got := autostr.String(Person{"A", 2}, cfg)
 	if got == "" || got == "<nil>" {
 		t.Fatalf("defaults not applied: %q", got)
 	}
 }
 
+// --- PrettyPrint & alignment tests ---
+
+// Uses PrettyPrint=true to ensure multi-line values align under the value column.
+// Also verifies that Windows newlines are normalized and trailing newlines trimmed.
+func Test_PrettyPrint_MultilineAlignment(t *testing.T) {
+	type Doc struct {
+		Title string `string:"include" display:"T"`
+		Body  string `string:"include" display:"Body"`
+	}
+	v := Doc{
+		Title: "One",
+		Body:  "line1\r\nline2\n", // includes Windows-style \r\n and trailing \n
+	}
+
+	cfg := autostr.DefaultConfig()
+	cfg.PrettyPrint = true
+
+	got := autostr.String(v, cfg)
+	// indent = max(len("T"), len("Body")) = 4
+	// For "T" (len=1): pad=3 => "T" + "   : One"
+	// Separator between fields is ", "
+	// For "Body" (len=4): pad=0, first line ": line1"; subsequent lines prefixed with 4 spaces + ": "
+	// Windows newlines normalized and trailing newline trimmed
+	want := "T   : One, Body: line1\n    : line2"
+	if got != want {
+		t.Fatalf("PrettyPrint alignment mismatch.\nGot:\n%q\nWant:\n%q", got, want)
+	}
+}
+
+// Ensures that when ShowZeroValue=false, zero-value fields are omitted from both output
+// and width calculation (so long key names that are zero don't affect alignment).
+func Test_PrettyPrint_WidthIgnoresZeroWhenShowZeroFalse(t *testing.T) {
+	type S struct {
+		LongZero string `string:"include" display:"VeryLongKey"`
+		Short    string `string:"include" display:"K"`
+	}
+	v := S{
+		LongZero: "",     // zero-value, should be omitted
+		Short:    "val",  // only field shown
+	}
+
+	cfg := autostr.DefaultConfig()
+	cfg.PrettyPrint = true
+	cfg.ShowZeroValue = false
+
+	got := autostr.String(v, cfg)
+	// Because LongZero is omitted, indent = len("K") = 1; pad for "K" is 0
+	// So no extra left spaces before ": "
+	want := "K: val"
+	if got != want {
+		t.Fatalf("width calc with zero omitted mismatch.\nGot:  %q\nWant: %q", got, want)
+	}
+}
+
+// Ensures PrettyPrint plays nicely with custom separators.
+func Test_PrettyPrint_CustomSeparators_Newline(t *testing.T) {
+    type P struct {
+        A string `string:"include" display:"A"`
+        B string `string:"include" display:"BBB"`
+    }
+    v := P{A: "x", B: "y\nz"}
+
+    cfg := autostr.DefaultConfig()
+    cfg.PrettyPrint = true
+    cfg.Separator = autostr.Ptr("\n")
+    cfg.FieldValueSeparator = autostr.Ptr(" : ")
+
+    // indent = 3; colon column aligns across all lines:
+    // "A"   -> pad=2 + " : "  => "A   : x"
+    // "BBB" -> pad=0 + " : "  => "BBB : y"
+    // cont  -> indent(3) + " : " => "    : z" (4 spaces before ':')
+    want := "A   : x\nBBB : y\n    : z"
+    got := autostr.String(v, cfg)
+    if got != want {
+        t.Fatalf("PrettyPrint with custom separators mismatch.\nGot:\n%q\nWant:\n%q", got, want)
+    }
+}
+// Ensures PrettyPrint plays nicely with custom separators.
+func Test_PrettyPrint_PipeSeparators(t *testing.T) {
+	type P struct {
+		A string `string:"include" display:"A"`
+		B string `string:"include" display:"BBB"`
+	}
+	v := P{A: "x", B: "y\nz"}
+
+	cfg := autostr.DefaultConfig()
+	cfg.PrettyPrint = true
+	cfg.Separator = autostr.Ptr(" | ")
+	cfg.FieldValueSeparator = autostr.Ptr(" : ")
+
+	want := "A   : x | BBB : y\n    : z"
+	got := autostr.String(v, cfg)
+	if got != want {
+		t.Fatalf("PrettyPrint with custom separators mismatch.\nGot:\n%q\nWant:\n%q", got, want)
+	}
+}
+
+//  helpers 
 func containsAll(s string, parts []string) bool {
 	for _, p := range parts {
 		if !strings.Contains(s, p) {

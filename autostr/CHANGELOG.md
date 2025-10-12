@@ -4,6 +4,18 @@ All notable changes to the `autostr` module will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.5] - 2025-10-12
+
+### Added
+- **PrettyPrint mode** (`Config.PrettyPrint`) for aligned, multi-line value formatting with proper indentation.
+- **Helper functions:**
+  - `measureKeyColumnWidth` — computes key column width for aligned output.
+  - `formatValueAligned` — aligns multi-line values under their corresponding key columns.
+- **Extended test suite:**
+  - Added PrettyPrint, alignment, and newline normalization tests.
+  - Verified zero-value field exclusion effects on column width.
+  - Confirmed support for custom separators including `\n`.
+
 ## [0.1.4] - 2025-10-09
 ### Fixed
 - Docs and CI badge finalized; code formatted with `gofmt -s`.
