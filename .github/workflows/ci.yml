@@ -10,7 +10,6 @@ on:
 
 permissions:
   contents: read
-  id-token: write   
 
 jobs:
   test_all:
@@ -60,7 +59,7 @@ jobs:
           path: .coverage/*.out
 
       - name: Upload coverage to Codecov
-        if: ${{ hashFiles('.coverage/*.out') != '' }}
+        if: ${{ hashFiles('.coverage/*.out') != '' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.fork == false) }}
         uses: codecov/codecov-action@v4
         with:
           files: .coverage/*.out

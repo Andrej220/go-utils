@@ -1,0 +1,53 @@
+codecov:
+  require_ci_to_pass: false
+
+coverage:
+  precision: 2         
+  round: down          
+  range: "50...95"     
+
+  status:
+    project:
+      default:
+        target: auto   
+        threshold: 1%  
+        base: auto
+    patch:
+      default:
+        target: auto   
+        threshold: 1%  
+
+comment:
+  layout: "reach, diff, files"
+  require_changes: false   
+  behavior: default
+
+ignore:
+  - "**/*_generated.go"
+  - "**/mock_*/*.go"
+  - "**/mocks/**/*.go"
+  - "**/internal/tools/**"
+  - "**/vendor/**"
+  - "**/examples/**"
+  - "**/*.pb.go"           
+  - "**/*.gen.go"          
+
+flags:
+  autostr:
+    paths:
+      - autostr/
+  wpool:
+    paths:
+      - wpool/
+  zlog:
+    paths:
+      - zlog/
+  backoff:
+    paths:
+      - backoff/
+  httpsrv:
+    paths:
+      - httpsrv/
+  grlimit:
+    paths:
+      - grlimit/

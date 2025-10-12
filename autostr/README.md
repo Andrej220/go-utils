@@ -4,6 +4,7 @@
 [![Go Reference](https://pkg.go.dev/badge/github.com/azargarov/go-utils/autostr.svg)](https://pkg.go.dev/github.com/azargarov/go-utils/autostr)
 [![CI](https://github.com/azargarov/go-utils/actions/workflows/ci.yml/badge.svg)](https://github.com/azargarov/go-utils/actions/workflows/ci.yml)
 [![Go Report Card](https://goreportcard.com/badge/github.com/azargarov/go-utils/autostr)](https://goreportcard.com/report/github.com/azargarov/go-utils/autostr)
+[![codecov](https://codecov.io/gh/azargarov/go-utils/branch/main/graph/badge.svg)](https://app.codecov.io/gh/azargarov/go-utils)
 
 
 `autostr` is a small, reflection-based Go library that automatically converts structs into human-readable strings using struct tags — similar to how `encoding/json` converts structs into JSON.
