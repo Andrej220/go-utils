@@ -1,0 +1,41 @@
+name: Release netfetch
+
+on:
+  push:
+    tags:
+      - 'netfetch/v*'  # Trigger on version tags like v1.0.0
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: '1.21'
+
+      - name: Build netfetch binaries
+        run: |
+          # Build for multiple platforms
+          GOOS=linux GOARCH=amd64 go build -o netfetch-linux-amd64 ./netfetch
+          GOOS=linux GOARCH=arm64 go build -o netfetch-linux-arm64 ./netfetch
+          GOOS=darwin GOARCH=amd64 go build -o netfetch-darwin-amd64 ./netfetch
+          GOOS=darwin GOARCH=arm64 go build -o netfetch-darwin-arm64 ./netfetch
+          GOOS=windows GOARCH=amd64 go build -o netfetch-windows-amd64.exe ./netfetch
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: |
+            netfetch-linux-amd64
+            netfetch-linux-arm64
+            netfetch-darwin-amd64
+            netfetch-darwin-arm64
+            netfetch-windows-amd64.exe
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

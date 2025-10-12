@@ -31,7 +31,7 @@ func mustJSON(t testing.TB, v any) io.Reader {
 func shortCfg() ServerConfig {
 	return ServerConfig{
 		Addr:            "127.0.0.1",
-		Port:            "0", 
+		Port:            "0",
 		ShutdownTimeout: 200 * time.Millisecond,
 		Logger:          lg.Discard, // keep tests quiet
 	}
@@ -115,7 +115,7 @@ func TestValidationHandler_EmptyBody(t *testing.T) {
 	if rr.Code != http.StatusBadRequest {
 		t.Fatalf("want 400 got %d", rr.Code)
 	}
-	
+
 	resp := APIError{}
 
 	_ = json.Unmarshal(rr.Body.Bytes(), &resp)
@@ -193,7 +193,7 @@ func TestNormalize_UsesEnvPort(t *testing.T) {
 	}
 }
 
-// nil handler should not crash 
+// nil handler should not crash
 func TestRunServer_DefaultHandlerWhenNil(t *testing.T) {
 	done := make(chan error, 1)
 	go func() { done <- RunServer(nil, shortCfg()) }()

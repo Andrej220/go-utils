@@ -7,11 +7,11 @@ import (
 )
 
 var (
-	ErrShutdown  = errors.New("gate is shutting down")
+	ErrShutdown        = errors.New("gate is shutting down")
 	ErrNilJobSubmitted = errors.New("nil job submitted")
 )
 
-const(
+const (
 	defaultErrBuffer = 10
 )
 
@@ -22,27 +22,29 @@ type Job interface {
 
 // Gate limits the number of concurrently running jobs.
 // One-shot: after CloseAndWait, Submit will return ErrShutdown and Errors() is closed.
-type Gate struct{
-	closed			atomic.Bool
-	sem 			chan struct{}	// max concurrent jobs
-	errs			chan error
+type Gate struct {
+	closed atomic.Bool
+	sem    chan struct{} // max concurrent jobs
+	errs   chan error
 }
 
 // NewGate creates a new go routine limiter with the given capacity.
-func NewGate(cap int) *Gate{
-	if cap <= 0{ cap = 1 }
+func NewGate(cap int) *Gate {
+	if cap <= 0 {
+		cap = 1
+	}
 
 	return &Gate{
-		sem: make(chan struct{}, cap),
+		sem:  make(chan struct{}, cap),
 		errs: make(chan error, defaultErrBuffer),
 	}
 }
 
 // Submit blocks until a slot is available or ctx is canceled.
 // Returns ErrShutdown after the gate has been closed.
-func (g *Gate) Submit(ctx context.Context, jb Job) error{
+func (g *Gate) Submit(ctx context.Context, jb Job) error {
 
-	if jb == nil{
+	if jb == nil {
 		return ErrNilJobSubmitted
 	}
 
@@ -50,14 +52,14 @@ func (g *Gate) Submit(ctx context.Context, jb Job) error{
 		return ErrShutdown
 	}
 
-	select{
-	case g.sem <- struct{}{}: 		//take a slot
-	    // prevent starting after shutdown flipped
-		if g.closed.Load(){
+	select {
+	case g.sem <- struct{}{}: //take a slot
+		// prevent starting after shutdown flipped
+		if g.closed.Load() {
 			<-g.sem
 			return ErrShutdown
 		}
-		go g.worker(ctx, jb)	    
+		go g.worker(ctx, jb)
 		return nil
 	case <-ctx.Done():
 		return ctx.Err()
@@ -74,33 +76,33 @@ func (g *Gate) CloseAndWait() {
 	for i := 0; i < g.Capacity(); i++ {
 		g.sem <- struct{}{}
 	}
-	      // draining queue -> idle state, if reuse is implemented
-	      //for i := 0; i < g.Capacity(); i++ {
-	      //	<-g.sem
-	      //}
+	// draining queue -> idle state, if reuse is implemented
+	//for i := 0; i < g.Capacity(); i++ {
+	//	<-g.sem
+	//}
 	close(g.errs)
 }
 
-func (g *Gate) InUse() int{ return len(g.sem) }
-func (g *Gate) Capacity() int{ return cap(g.sem) }
+func (g *Gate) InUse() int           { return len(g.sem) }
+func (g *Gate) Capacity() int        { return cap(g.sem) }
 func (g *Gate) Errors() <-chan error { return g.errs }
-func (g *Gate) Available() int  { return g.Capacity() - g.InUse() }
+func (g *Gate) Available() int       { return g.Capacity() - g.InUse() }
 
-func (g *Gate)worker(ctx context.Context, jb Job){
-	defer func(){<-g.sem}()	// Release ticket
-	defer func() { 
-		if r := recover(); r != nil{
+func (g *Gate) worker(ctx context.Context, jb Job) {
+	defer func() { <-g.sem }() // Release ticket
+	defer func() {
+		if r := recover(); r != nil {
 			//TODO: log panic
 		}
 	}()
 
 	select {
-	case <- ctx.Done():
+	case <-ctx.Done():
 		return
 	default:
 	}
 	err := jb.Run(ctx)
-	if err != nil{
+	if err != nil {
 		select {
 		case g.errs <- err:
 		default:

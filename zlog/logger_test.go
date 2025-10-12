@@ -1,162 +1,162 @@
 package zlog
 
 import (
+	"bytes"
 	"context"
+	"go.uber.org/zap/zapcore"
+	"log"
 	"strings"
 	"testing"
-	"log"
-	"bytes"
-    "go.uber.org/zap/zapcore"
 )
 
 func TestStdLoggerAt_DefaultBackend_RoutesToError(t *testing.T) {
-    var buf bytes.Buffer
-    oldOut, oldFlags := log.Writer(), log.Flags()
-    log.SetOutput(&buf)
-    log.SetFlags(0)
-    defer func() { log.SetOutput(oldOut); log.SetFlags(oldFlags) }()
+	var buf bytes.Buffer
+	oldOut, oldFlags := log.Writer(), log.Flags()
+	log.SetOutput(&buf)
+	log.SetFlags(0)
+	defer func() { log.SetOutput(oldOut); log.SetFlags(oldFlags) }()
 
-    var d defaultLogger
-    std := StdLoggerAt(d, zapcore.ErrorLevel)
+	var d defaultLogger
+	std := StdLoggerAt(d, zapcore.ErrorLevel)
 
-    std.Println("boom")
+	std.Println("boom")
 
-    out := buf.String()
-    if !strings.Contains(out, "ERROR: boom") {
-        t.Fatalf("stdlog adapter did not route to defaultLogger.Error; got: %q", out)
-    }
+	out := buf.String()
+	if !strings.Contains(out, "ERROR: boom") {
+		t.Fatalf("stdlog adapter did not route to defaultLogger.Error; got: %q", out)
+	}
 }
 
 func TestStdLoggerAt_ZapBackend_NoPanic(t *testing.T) {
-    lg := New(&Config{
-        ServiceName: "test-service",
-        Debug:       false,
-        Format:      ZLoggerJsonFormat,
-    }) 
+	lg := New(&Config{
+		ServiceName: "test-service",
+		Debug:       false,
+		Format:      ZLoggerJsonFormat,
+	})
 
-    std := StdLoggerAt(lg, zapcore.ErrorLevel)
-    if std == nil {
-        t.Fatal("StdLoggerAt returned nil *log.Logger for zap backend")
-    }
+	std := StdLoggerAt(lg, zapcore.ErrorLevel)
+	if std == nil {
+		t.Fatal("StdLoggerAt returned nil *log.Logger for zap backend")
+	}
 
-    std.Println("zap stdlog bridge smoke test")
+	std.Println("zap stdlog bridge smoke test")
 }
 
 func TestStdLoggerAt_DefaultBackend_RoutesToWarn(t *testing.T) {
-    var buf bytes.Buffer
-    oldOut, oldFlags := log.Writer(), log.Flags()
-    log.SetOutput(&buf)
-    log.SetFlags(0)
-    defer func() { log.SetOutput(oldOut); log.SetFlags(oldFlags) }()
+	var buf bytes.Buffer
+	oldOut, oldFlags := log.Writer(), log.Flags()
+	log.SetOutput(&buf)
+	log.SetFlags(0)
+	defer func() { log.SetOutput(oldOut); log.SetFlags(oldFlags) }()
 
-    var d defaultLogger
-    std := StdLoggerAt(d, zapcore.WarnLevel)
+	var d defaultLogger
+	std := StdLoggerAt(d, zapcore.WarnLevel)
 
-    std.Println("heads up")
+	std.Println("heads up")
 
-    out := buf.String()
-    if !strings.Contains(out, "WARN: heads up") {
-        t.Fatalf("expected WARN routing; got: %q", out)
-    }
+	out := buf.String()
+	if !strings.Contains(out, "WARN: heads up") {
+		t.Fatalf("expected WARN routing; got: %q", out)
+	}
 }
 
 func TestNew_ProductionConfig(t *testing.T) {
-    cfg := &Config{
-        ServiceName: "test-service",
-        Debug:       false,
-        Format:      ZLoggerJsonFormat,
-    }
-    
-    logger := New(cfg)
-    if _, ok := logger.(*zapLogger); !ok {
-        t.Error("Expected zapLogger in production mode")
-    }
+	cfg := &Config{
+		ServiceName: "test-service",
+		Debug:       false,
+		Format:      ZLoggerJsonFormat,
+	}
+
+	logger := New(cfg)
+	if _, ok := logger.(*zapLogger); !ok {
+		t.Error("Expected zapLogger in production mode")
+	}
 }
 
 func TestNew_DebugConfig(t *testing.T) {
-    cfg := &Config{
-        ServiceName: "test-service",
-        Debug:       true,
-        Format:      ZLoggerConsoleFormat,
-    }
-    
-    logger := New(cfg)
-    if _, ok := logger.(*zapLogger); !ok {
-        t.Error("Expected zapLogger in debug mode")
-    }
+	cfg := &Config{
+		ServiceName: "test-service",
+		Debug:       true,
+		Format:      ZLoggerConsoleFormat,
+	}
+
+	logger := New(cfg)
+	if _, ok := logger.(*zapLogger); !ok {
+		t.Error("Expected zapLogger in debug mode")
+	}
 }
 
 // Test invalid config that should trigger fallback
 func TestNew_FallbackToDefault(t *testing.T) {
 	old := log.Writer()
-    defer log.SetOutput(old)
+	defer log.SetOutput(old)
 
 	var buf bytes.Buffer
-    log.SetOutput(&buf)
+	log.SetOutput(&buf)
 
 	cfg := &Config{
 		ServiceName: "test-service",
-        Debug:       false,
-        Format:      "invalid format", // <-- must be an invalid encoding format
-    }
+		Debug:       false,
+		Format:      "invalid format", // <-- must be an invalid encoding format
+	}
 
-    logger := New(cfg)
-    if _, ok := logger.(defaultLogger); !ok {
-        t.Error("Expecte default logger")
-    }
+	logger := New(cfg)
+	if _, ok := logger.(defaultLogger); !ok {
+		t.Error("Expecte default logger")
+	}
 }
 
 func TestContextIntegration(t *testing.T) {
-    logger := New(&Config{ServiceName: "test"})
-    ctx := Attach(context.Background(), logger)
-    
-    retrieved := FromContext(ctx)
-    if retrieved != logger {
-        t.Error("Logger not properly retrieved from context")
-    }
+	logger := New(&Config{ServiceName: "test"})
+	ctx := Attach(context.Background(), logger)
+
+	retrieved := FromContext(ctx)
+	if retrieved != logger {
+		t.Error("Logger not properly retrieved from context")
+	}
 }
 
 func TestFromContext_NoLogger(t *testing.T) {
-    // Test empty context returns default logger
-    logger := FromContext(context.Background())
-    if _, ok := logger.(defaultLogger); !ok {
-        t.Error("Expected defaultLogger from empty context")
-    }
+	// Test empty context returns default logger
+	logger := FromContext(context.Background())
+	if _, ok := logger.(defaultLogger); !ok {
+		t.Error("Expected defaultLogger from empty context")
+	}
 }
 
 func TestWithFields(t *testing.T) {
-    logger := New(&Config{ServiceName: "test"})
-    loggerWithFields := logger.With(String("key", "value"))
-    
-    // Verify it returns the same type
-    if _, ok := loggerWithFields.(*zapLogger); !ok {
-        t.Error("With() should return same logger type")
-    }
+	logger := New(&Config{ServiceName: "test"})
+	loggerWithFields := logger.With(String("key", "value"))
+
+	// Verify it returns the same type
+	if _, ok := loggerWithFields.(*zapLogger); !ok {
+		t.Error("With() should return same logger type")
+	}
 }
 
 // Test that noopLogger methods don't panic
 func TestDiscardLogger(t *testing.T) {
-    Discard.Info("test")
-    Discard.Error("test")
-    Discard.With(String("key", "value"))
+	Discard.Info("test")
+	Discard.Error("test")
+	Discard.With(String("key", "value"))
 }
 
 func TestDebugFromEnv(t *testing.T) {
-    t.Setenv("APP_DEBUG", "true")
-    if !DebugFromEnv() {
-        t.Error("DebugFromEnv should detect true")
-    }
-    
-    t.Setenv("APP_DEBUG", "false")
-    if DebugFromEnv() {
-        t.Error("DebugFromEnv should detect false")
-    }
+	t.Setenv("APP_DEBUG", "true")
+	if !DebugFromEnv() {
+		t.Error("DebugFromEnv should detect true")
+	}
+
+	t.Setenv("APP_DEBUG", "false")
+	if DebugFromEnv() {
+		t.Error("DebugFromEnv should detect false")
+	}
 }
 
 func TestFlattenFunction(t *testing.T) {
-    result := flatten(String("user", "alice"), Int("age", 30))
+	result := flatten(String("user", "alice"), Int("age", 30))
 
-    if !strings.Contains(result, "user=alice") || !strings.Contains(result, "age=30") {
-        t.Errorf("Flatten failed: %s", result)
-    }
+	if !strings.Contains(result, "user=alice") || !strings.Contains(result, "age=30") {
+		t.Errorf("Flatten failed: %s", result)
+	}
 }

@@ -94,6 +94,20 @@ jobs:
           fi
           echo "pkg=$PKG" >> "$GITHUB_OUTPUT"
 
+      - name: Gofmt (check, simplified)
+        working-directory: ${{ steps.tagpkg.outputs.pkg }}
+        run: |
+          set -euo pipefail
+          OUT="$(gofmt -s -l . || true)"
+          if [ -n "$OUT" ]; then
+            echo "The following files are not gofmt -s formatted:"
+            echo "$OUT"
+            echo
+            echo "Diff (gofmt -s -d):"
+            gofmt -s -d .
+            exit 1
+          fi
+          
       - name: Vet (${{ steps.tagpkg.outputs.pkg }})
         working-directory: ${{ steps.tagpkg.outputs.pkg }}
         run: go vet ./...

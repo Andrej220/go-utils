@@ -9,6 +9,7 @@ import (
 
 // Adaptor to build jobs inline in tests.
 type JobFunc func(ctx context.Context) error
+
 func (f JobFunc) Run(ctx context.Context) error { return f(ctx) }
 
 func startErrConsumer(g *Gate) (done chan struct{}, got chan error) {
@@ -75,7 +76,7 @@ func TestErrorsForwarded(t *testing.T) {
 	if err := g.Submit(context.Background(), JobFunc(func(ctx context.Context) error { return want })); err != nil {
 		t.Fatalf("submit: %v", err)
 	}
-	
+
 	g.CloseAndWait()
 	select {
 	case err := <-errCh:

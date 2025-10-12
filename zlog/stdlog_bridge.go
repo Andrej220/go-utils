@@ -33,7 +33,7 @@ func StdLoggerAt(lg ZLogger, lvl zapcore.Level) *log.Logger {
 		if std, err := zap.NewStdLogAt(zl.l, lvl); err == nil {
 			return std
 		}
-		return zap.NewStdLog(zl.l) 
+		return zap.NewStdLog(zl.l)
 	}
 	return log.New(zlogWriter{L: lg, Level: lvl}, "", 0)
 }
