@@ -80,3 +80,10 @@ jobs:
           name: coverage-tag-${{ matrix.go }}
           path: .coverage/*.out
           if-no-files-found: ignore
+          
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v4
+        with:
+          files: .coverage/*.out
+          flags: unittests
+          fail_ci_if_error: false
