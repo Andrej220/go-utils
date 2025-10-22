@@ -15,6 +15,8 @@ import (
 const (
 	ZLoggerJsonFormat    = "json"
 	ZLoggerConsoleFormat = "console"
+	samplingInitial      = 100
+	samplingAfter        = 100
 )
 
 // Field is a structured log field, aliasing zapcore.Field
@@ -44,6 +46,7 @@ type Config struct {
 	ServiceName string
 	Debug       bool
 	Format      string // "json" or "console"
+	ForceStderr bool   // route all logs to stder
 }
 
 func DebugFromEnv() bool {
@@ -84,7 +87,12 @@ func New(cfg *Config) ZLogger {
 	baseCfg.InitialFields = map[string]any{"service": cfg.ServiceName}
 
 	// Enable sampling for high-throughput logs
-	baseCfg.Sampling = &zap.SamplingConfig{Initial: 100, Thereafter: 100}
+	baseCfg.Sampling = &zap.SamplingConfig{Initial: samplingInitial, Thereafter: samplingAfter}
+
+	if cfg.ForceStderr {
+		baseCfg.OutputPaths = []string{"stderr"}
+		baseCfg.ErrorOutputPaths = []string{"stderr"}
+	}
 
 	logger, err := baseCfg.Build(zap.AddCaller(), zap.AddStacktrace(zapcore.ErrorLevel))
 	if err != nil {

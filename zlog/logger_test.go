@@ -1,12 +1,16 @@
 package zlog
 
 import (
+	"bufio"
 	"bytes"
 	"context"
 	"go.uber.org/zap/zapcore"
+	"io"
 	"log"
+	"os"
 	"strings"
 	"testing"
+	"time"
 )
 
 func TestStdLoggerAt_DefaultBackend_RoutesToError(t *testing.T) {
@@ -158,5 +162,77 @@ func TestFlattenFunction(t *testing.T) {
 
 	if !strings.Contains(result, "user=alice") || !strings.Contains(result, "age=30") {
 		t.Errorf("Flatten failed: %s", result)
+	}
+}
+
+// test force stderr functionality
+func hijackFile(f **os.File) (restore func(), r *os.File, err error) {
+	pr, pw, err := os.Pipe()
+	if err != nil {
+		return nil, nil, err
+	}
+	old := *f
+	*f = pw
+	restore = func() {
+		_ = pw.Close()
+		*f = old
+		_ = pr.Close()
+	}
+	return restore, pr, nil
+}
+
+func readAllWithDeadline(t *testing.T, r io.Reader) string {
+	t.Helper()
+	var buf bytes.Buffer
+	br := bufio.NewReader(r)
+
+	done := make(chan struct{})
+	go func() {
+		io.Copy(&buf, br)
+		close(done)
+	}()
+
+	select {
+	case <-done:
+	case <-time.After(200 * time.Millisecond):
+	}
+	return buf.String()
+}
+
+func TestNew_ForceStderr_RoutesAllToStderr(t *testing.T) {
+	restoreStdout, rOut, err := hijackFile(&os.Stdout)
+	if err != nil {
+		t.Fatalf("stdout hijack failed: %v", err)
+	}
+	defer restoreStdout()
+
+	restoreStderr, rErr, err := hijackFile(&os.Stderr)
+	if err != nil {
+		restoreStdout()
+		t.Fatalf("stderr hijack failed: %v", err)
+	}
+	defer restoreStderr()
+
+	lg := New(&Config{
+		ServiceName: "test-svc",
+		Debug:       false,
+		Format:      ZLoggerJsonFormat,
+		ForceStderr: true,
+	})
+	lg.Info("hello stderr", String("k", "v"))
+	_ = lg.Sync()
+
+	_ = os.Stdout.Close()
+	_ = os.Stderr.Close()
+
+	// ---- Assert: nothing on stdout; something on stderr ----
+	stdout := readAllWithDeadline(t, rOut)
+	stderr := readAllWithDeadline(t, rErr)
+
+	if strings.Contains(stdout, "hello stderr") {
+		t.Fatalf("expected no output on stdout, but found: %q", stdout)
+	}
+	if !strings.Contains(stderr, "hello stderr") {
+		t.Fatalf("expected log on stderr, got: %q", stderr)
 	}
 }
