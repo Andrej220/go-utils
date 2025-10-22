@@ -7,6 +7,7 @@ import (
 	"go.uber.org/zap/zapcore"
 	"log"
 	"os"
+	"path/filepath"
 	"slices"
 	"strings"
 	"time"
@@ -141,17 +142,29 @@ func (z *zapLogger) Warn(msg string, fields ...Field) {
 
 // defaultLogger falls back to the standard log package.
 type defaultLogger struct {
-	base []Field
+	base   []Field
+	logger *log.Logger
 }
 
+func newDefaultLogger() *defaultLogger {
+	return &defaultLogger{
+		base: []Field{
+			String("app", detectAppName()),
+		},
+		logger: log.New(os.Stderr, "", log.LstdFlags),
+	}
+}
+
+// base holds persistent structured fields for this logger instance.
+// We clone it before appending new fields to avoid slice aliasing.
 func (d defaultLogger) Info(msg string, fields ...Field) {
 	all := append(slices.Clone(d.base), fields...)
-	log.Println("INFO:", msg, flatten(all...))
+	d.logger.Println("INFO:", msg, flatten(all...))
 }
 
 func (d defaultLogger) Error(msg string, fields ...Field) {
 	all := append(slices.Clone(d.base), fields...)
-	log.Println("ERROR:", msg, flatten(all...))
+	d.logger.Println("ERROR:", msg, flatten(all...))
 }
 
 func (d defaultLogger) With(fields ...Field) ZLogger {
@@ -162,11 +175,11 @@ func (d defaultLogger) With(fields ...Field) ZLogger {
 func (d defaultLogger) Sync() error { return nil }
 func (d defaultLogger) Debug(msg string, fields ...Field) {
 	all := append(slices.Clone(d.base), fields...)
-	log.Println("DEBUG:", msg, flatten(all...))
+	d.logger.Println("DEBUG:", msg, flatten(all...))
 }
 func (d defaultLogger) Warn(msg string, fields ...Field) {
 	all := append(slices.Clone(d.base), fields...)
-	log.Println("WARN:", msg, flatten(all...))
+	d.logger.Println("WARN:", msg, flatten(all...))
 }
 
 func flatten(fields ...zapcore.Field) string {
@@ -200,7 +213,7 @@ func FromContext(ctx context.Context) ZLogger {
 	if lg, ok := ctx.Value(ctxKey{}).(ZLogger); ok && lg != nil {
 		return lg
 	}
-	return defaultLogger{}
+	return newDefaultLogger()
 }
 
 // noopLogger does absolutely nothing. For test only
@@ -214,6 +227,14 @@ func (noopLogger) With(_ ...Field) ZLogger      { return noopLogger{} }
 func (noopLogger) Sync() error                  { return nil }
 
 var Discard ZLogger = noopLogger{}
+
+func detectAppName() string {
+	exe, err := os.Executable()
+	if err == nil {
+		return filepath.Base(exe)
+	}
+	return filepath.Base(os.Args[0])
+}
 
 //func _flatten(fields ...zapcore.Field) string {
 //	enc := zapcore.NewConsoleEncoder(zapcore.EncoderConfig{ConsoleSeparator: " "})
