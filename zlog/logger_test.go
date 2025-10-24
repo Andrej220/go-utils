@@ -123,7 +123,7 @@ func TestContextIntegration(t *testing.T) {
 func TestFromContext_NoLogger(t *testing.T) {
 	// Test empty context returns default logger
 	logger := FromContext(context.Background())
-	if _, ok := logger.(*defaultLogger); !ok {
+	if _, ok := logger.(defaultLogger); !ok {
 		t.Error("Expected defaultLogger from empty context")
 	}
 }

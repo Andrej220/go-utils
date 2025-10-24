@@ -146,8 +146,8 @@ type defaultLogger struct {
 	logger *log.Logger
 }
 
-func newDefaultLogger() *defaultLogger {
-	return &defaultLogger{
+func newDefaultLogger() defaultLogger {
+	return defaultLogger{
 		base: []Field{
 			String("app", detectAppName()),
 		},
@@ -169,7 +169,10 @@ func (d defaultLogger) Error(msg string, fields ...Field) {
 
 func (d defaultLogger) With(fields ...Field) ZLogger {
 	all := append(slices.Clone(d.base), fields...)
-	return defaultLogger{base: all}
+	return defaultLogger{
+		base:   all,
+		logger: d.logger,
+	}
 }
 
 func (d defaultLogger) Sync() error { return nil }
