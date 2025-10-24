@@ -1,9 +1,9 @@
-module github.com/Andrej220/go-utils/httpsrv
+module github.com/azargarov/go-utils/httpsrv
 
 go 1.23
 
 require (
-	github.com/Andrej220/go-utils/zlog v0.1.1
+	github.com/azargarov/go-utils/zlog v0.1.1
 	go.uber.org/zap v1.27.0
 )
 

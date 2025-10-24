@@ -1,4 +1,4 @@
-module github.com/Andrej220/go-utils/zlog
+module github.com/azargarov/go-utils/zlog
 
 go 1.23
 

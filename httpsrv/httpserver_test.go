@@ -14,7 +14,7 @@ import (
 	"testing"
 	"time"
 
-	lg "github.com/Andrej220/go-utils/zlog"
+	lg "github.com/azargarov/go-utils/zlog"
 )
 
 type dto struct{ Name string }
