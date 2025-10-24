@@ -1,3 +1,3 @@
-module github.com/Andrej220/go-utils/grlimit
+module github.com/azargarov/go-utils/grlimit
 
 go 1.23

@@ -1,3 +1,3 @@
-module github.com/Andrej220/go-utils/netfetch
+module github.com/azargarov/go-utils/netfetch
 
 go 1.23

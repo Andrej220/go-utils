@@ -1,10 +1,10 @@
 go 1.23.6
 
 use (
+	./autostr
 	./backoff
 	./grlimit
 	./httpsrv
 	./wpool
 	./zlog
-	./autostr
 )
