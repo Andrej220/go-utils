@@ -20,7 +20,7 @@ func TestStdLoggerAt_DefaultBackend_RoutesToError(t *testing.T) {
 	log.SetFlags(0)
 	defer func() { log.SetOutput(oldOut); log.SetFlags(oldFlags) }()
 
-	var d defaultLogger
+	d := defaultLogger{logger: log.New(log.Default().Writer(), "", log.LstdFlags)}
 	std := StdLoggerAt(d, zapcore.ErrorLevel)
 
 	std.Println("boom")
@@ -53,7 +53,7 @@ func TestStdLoggerAt_DefaultBackend_RoutesToWarn(t *testing.T) {
 	log.SetFlags(0)
 	defer func() { log.SetOutput(oldOut); log.SetFlags(oldFlags) }()
 
-	var d defaultLogger
+	d := defaultLogger{logger: log.New(log.Default().Writer(), "", log.LstdFlags)}
 	std := StdLoggerAt(d, zapcore.WarnLevel)
 
 	std.Println("heads up")
@@ -123,7 +123,7 @@ func TestContextIntegration(t *testing.T) {
 func TestFromContext_NoLogger(t *testing.T) {
 	// Test empty context returns default logger
 	logger := FromContext(context.Background())
-	if _, ok := logger.(defaultLogger); !ok {
+	if _, ok := logger.(*defaultLogger); !ok {
 		t.Error("Expected defaultLogger from empty context")
 	}
 }
