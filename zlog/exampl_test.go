@@ -17,8 +17,8 @@ func ExampleNewDefault() {
 		zlog.String("env", "dev"),
 		zlog.Int("port", 8080),
 	)
+	// Logs are not written to stdout; nothing should be captured here.
 	// Output:
-	// (output format depends on environment)
 }
 
 func ExampleAttach() {
@@ -27,8 +27,8 @@ func ExampleAttach() {
 
 	ctx := zlog.Attach(context.Background(), lg)
 	zlog.FromContext(ctx).Info("request", zlog.String("path", "/health"))
+	// Logs are not written to stdout; nothing should be captured here.
 	// Output:
-	// (output format depends on environment)
 }
 
 func ExampleZLogger_RedirectStdLog() {
@@ -39,8 +39,8 @@ func ExampleZLogger_RedirectStdLog() {
 	defer restore()
 
 	log.Println("stdlib message promoted to WARN")
+	// The stdlib log is redirected to zap (not stdout).
 	// Output:
-	// (output format depends on environment)
 }
 
 func ExampleZLogger_RedirectOutput() {
@@ -54,6 +54,6 @@ func ExampleZLogger_RedirectOutput() {
 	defer restore()
 
 	lg.Info("written to file")
+	// Routed to a file; stdout remains empty.
 	// Output:
-	// (no stdout; message is written to file)
 }
