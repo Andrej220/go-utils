@@ -28,6 +28,8 @@ func (w zlogWriter) Write(p []byte) (int, error) {
 	return len(p), nil
 }
 
+// StdLoggerAt returns a *log.Logger that writes to lg at the provided zapcore level.
+// If lg is zap-backed, it uses zap.NewStdLogAt; otherwise it adapts via io.Writer.
 func StdLoggerAt(lg ZLogger, lvl zapcore.Level) *log.Logger {
 	if zl, ok := lg.(*zLog); ok && zl != nil {
 		if std, err := zap.NewStdLogAt(zl.l, lvl); err == nil {
@@ -38,6 +40,8 @@ func StdLoggerAt(lg ZLogger, lvl zapcore.Level) *log.Logger {
 	return log.New(zlogWriter{L: lg, Level: lvl}, "", 0)
 }
 
+// RedirectStdLogger redirects the global log package to lg at the given level.
+// It returns a restore function that reverts log's output, flags, and prefix.
 func RedirectStdLogger(lg ZLogger, lvl zapcore.Level) (restore func()) {
 	prevOut, prevFlags, prevPrefix := log.Writer(), log.Flags(), log.Prefix()
 	std := StdLoggerAt(lg, lvl)
@@ -51,6 +55,8 @@ func RedirectStdLogger(lg ZLogger, lvl zapcore.Level) (restore func()) {
 	}
 }
 
+// RedirectStdLogOutput redirects the global log package to the provided writer.
+// It returns a restore function that reverts log's output, flags, and prefix.
 func RedirectStdLogOutput(w io.Writer) (restore func()) {
 	prevOut := log.Writer()
 	prevFlags := log.Flags()

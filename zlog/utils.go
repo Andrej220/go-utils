@@ -30,6 +30,8 @@ func flatten(fields ...zapcore.Field) string {
 	return strings.Join(pairs, ", ")
 }
 
+// detectAppName attempts to detect the process' executable name to prefill the
+// "app" field in the stdlib fallback logger.
 func detectAppName() string {
 	exe, err := os.Executable()
 	if err == nil {

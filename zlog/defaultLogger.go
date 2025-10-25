@@ -9,13 +9,25 @@ import (
 	"sync"
 )
 
-// defaultLogger falls back to the standard log package.
+// defaultLogger is a stdlib-backed logger used as a safe fallback when
+// zap cannot be initialized. It prints key=value fields and never panics.
 type defaultLogger struct {
-	base    []Field
-	mu      sync.RWMutex
+	// base holds persistent structured fields included on every log call.
+	base []Field
+
+	// mu protects concurrent access to loggers.
+	mu sync.RWMutex
+
+	// loggers maps levels to dedicated *log.Logger instances.
+	// Using per-level loggers avoids global SetOutput churn.
 	loggers map[zapcore.Level]*log.Logger
 }
 
+// Ensure defaultLogger satisfies ZLogger at compile time.
+var _ ZLogger = (*defaultLogger)(nil)
+
+// newDefaultLogger constructs a defaultLogger prefilled with an "app" field
+// (derived from the executable name) and per-level *log.Logger outputs.
 func newDefaultLogger() *defaultLogger {
 	return &defaultLogger{
 		base: []Field{String("app", detectAppName())},
@@ -28,6 +40,9 @@ func newDefaultLogger() *defaultLogger {
 	}
 }
 
+// With returns a child logger that carries base+fields for subsequent calls.
+// It preserves the parent's per-level loggers so any RedirectOutput applied
+// to the parent continues to affect the child.
 func (d *defaultLogger) With(fields ...Field) ZLogger {
 	d.mu.RLock()
 	defer d.mu.RUnlock()
@@ -38,6 +53,9 @@ func (d *defaultLogger) With(fields ...Field) ZLogger {
 	return l
 }
 
+// RedirectStdLog redirects the global log package to this logger at the
+// provided level. It returns a restore function that reverts output, flags,
+// and prefix to their previous values.
 func (d *defaultLogger) RedirectStdLog(level zapcore.Level) (restore func()) {
 	if d == nil {
 		d = newDefaultLogger()
@@ -58,6 +76,8 @@ func (d *defaultLogger) RedirectStdLog(level zapcore.Level) (restore func()) {
 	}
 }
 
+// RedirectOutput routes this logger's output at the specified level to w.
+// It returns a restore function that restores the previous writer for that level.
 func (d *defaultLogger) RedirectOutput(w io.Writer, level zapcore.Level) (restore func()) {
 	if w == nil {
 		w = io.Discard
@@ -74,8 +94,7 @@ func (d *defaultLogger) RedirectOutput(w io.Writer, level zapcore.Level) (restor
 	}
 }
 
-// base holds persistent structured fields for this logger instance.
-// We clone it before appending new fields to avoid slice aliasing.
+// Info logs msg at Info level with optional structured fields.
 func (d *defaultLogger) Info(msg string, fields ...Field) {
 	all := append(slices.Clone(d.base), fields...)
 	d.mu.RLock()
@@ -84,6 +103,7 @@ func (d *defaultLogger) Info(msg string, fields ...Field) {
 	l.Println("INFO:", msg, flatten(all...))
 }
 
+// Error logs msg at Error level with optional structured fields.
 func (d *defaultLogger) Error(msg string, fields ...Field) {
 	all := append(slices.Clone(d.base), fields...)
 	d.mu.RLock()
@@ -92,8 +112,10 @@ func (d *defaultLogger) Error(msg string, fields ...Field) {
 	l.Println("ERROR:", msg, flatten(all...))
 }
 
+// Sync is a no-op for the stdlib-backed logger.
 func (d *defaultLogger) Sync() error { return nil }
 
+// Debug logs msg at Debug level with optional structured fields.
 func (d *defaultLogger) Debug(msg string, fields ...Field) {
 	all := append(slices.Clone(d.base), fields...)
 	d.mu.RLock()
@@ -102,6 +124,7 @@ func (d *defaultLogger) Debug(msg string, fields ...Field) {
 	l.Println("DEBUG:", msg, flatten(all...))
 }
 
+// Warn logs msg at Warn level with optional structured fields.
 func (d *defaultLogger) Warn(msg string, fields ...Field) {
 	all := append(slices.Clone(d.base), fields...)
 	d.mu.RLock()
