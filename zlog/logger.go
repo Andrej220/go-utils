@@ -1,14 +1,11 @@
 package zlog
 
 import (
-	"context"
-	"fmt"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
+	"io"
 	"log"
 	"os"
-	"path/filepath"
-	"slices"
 	"strings"
 	"time"
 )
@@ -40,6 +37,8 @@ type ZLogger interface {
 	Sync() error
 	Debug(msg string, fields ...Field)
 	Warn(msg string, fields ...Field)
+	RedirectStdLog(level zapcore.Level) (restore func())
+	RedirectOutput(w io.Writer, level zapcore.Level) (restore func())
 }
 
 // Config holds logging configuration options.
@@ -47,13 +46,12 @@ type Config struct {
 	ServiceName string
 	Debug       bool
 	Format      string // "json" or "console"
-	ForceStderr bool   // route all logs to stder
+	ForceStderr bool   // route all logs to stderr
 }
 
 func DebugFromEnv() bool {
-	return os.Getenv("APP_DEBUG") == "true" ||
-		os.Getenv("APP_DEBUG") == "1" ||
-		strings.EqualFold(os.Getenv("APP_DEBUG"), "true")
+	v := os.Getenv("APP_DEBUG")
+	return v == "1" || strings.EqualFold(v, "true")
 }
 
 func FormatFromEnv(defaultFormat string) string {
@@ -99,10 +97,10 @@ func New(cfg *Config) ZLogger {
 	if err != nil {
 		// Fall back to standard log if zap fails
 		log.Printf("[FATAL] cannot initialize zap logger: %v", err)
-		return defaultLogger{}
+		return newDefaultLogger()
 	}
 
-	return &zapLogger{l: logger}
+	return &zLog{l: logger}
 }
 
 // NewDefault creates a logger with default configuration
@@ -114,134 +112,71 @@ func NewDefault(serviceName string) ZLogger {
 	})
 }
 
-// zapLogger wraps a *zap.ZLogger to implement ZLogger.
-type zapLogger struct{ l *zap.Logger }
+// zLog wraps a *zap.ZLogger to implement ZLogger.
+type zLog struct{ l *zap.Logger }
 
-func (z *zapLogger) Info(msg string, fields ...Field) {
+func (z *zLog) Info(msg string, fields ...Field) {
 	z.l.Info(msg, fields...)
 }
 
-func (z *zapLogger) Error(msg string, fields ...Field) {
+func (z *zLog) Error(msg string, fields ...Field) {
 	z.l.Error(msg, fields...)
 }
 
-func (z *zapLogger) With(fields ...Field) ZLogger {
-	return &zapLogger{z.l.With(fields...)}
+func (z *zLog) With(fields ...Field) ZLogger {
+	return &zLog{z.l.With(fields...)}
 }
 
-func (z *zapLogger) Sync() error {
+func (z *zLog) Sync() error {
 	return z.l.Sync()
 }
 
-func (z *zapLogger) Debug(msg string, fields ...Field) {
+func (z *zLog) Debug(msg string, fields ...Field) {
 	z.l.Debug(msg, fields...)
 }
-func (z *zapLogger) Warn(msg string, fields ...Field) {
+func (z *zLog) Warn(msg string, fields ...Field) {
 	z.l.Warn(msg, fields...)
 }
 
-// defaultLogger falls back to the standard log package.
-type defaultLogger struct {
-	base   []Field
-	logger *log.Logger
-}
+func (z *zLog) RedirectStdLog(level zapcore.Level) (restore func()) {
 
-func newDefaultLogger() defaultLogger {
-	return defaultLogger{
-		base: []Field{
-			String("app", detectAppName()),
-		},
-		logger: log.New(os.Stderr, "", log.LstdFlags),
+	prevOut := log.Writer()
+	prevFlags := log.Flags()
+	prevPrefix := log.Prefix()
+
+	std := StdLoggerAt(z, level)
+	log.SetOutput(std.Writer())
+	log.SetFlags(0)
+	log.SetPrefix("")
+
+	return func() {
+		log.SetOutput(prevOut)
+		log.SetFlags(prevFlags)
+		log.SetPrefix(prevPrefix)
 	}
 }
 
-// base holds persistent structured fields for this logger instance.
-// We clone it before appending new fields to avoid slice aliasing.
-func (d defaultLogger) Info(msg string, fields ...Field) {
-	all := append(slices.Clone(d.base), fields...)
-	d.logger.Println("INFO:", msg, flatten(all...))
-}
+func (z *zLog) RedirectOutput(w io.Writer, level zapcore.Level) (restore func()) {
+	if w == nil {
+		w = io.Discard
+	}
+	old := z.l
 
-func (d defaultLogger) Error(msg string, fields ...Field) {
-	all := append(slices.Clone(d.base), fields...)
-	d.logger.Println("ERROR:", msg, flatten(all...))
-}
+	encCfg := zap.NewProductionEncoderConfig()
+	encCfg.EncodeTime = zapcore.RFC3339TimeEncoder
 
-func (d defaultLogger) With(fields ...Field) ZLogger {
-	all := append(slices.Clone(d.base), fields...)
-	return defaultLogger{
-		base:   all,
-		logger: d.logger,
+	lvl := zap.NewAtomicLevelAt(level)
+	newCore := zapcore.NewCore(
+		zapcore.NewJSONEncoder(encCfg),
+		zapcore.AddSync(w),
+		lvl,
+	)
+
+	z.l = old.WithOptions(zap.WrapCore(func(_ zapcore.Core) zapcore.Core {
+		return newCore
+	}))
+
+	return func() {
+		z.l = old
 	}
 }
-
-func (d defaultLogger) Sync() error { return nil }
-func (d defaultLogger) Debug(msg string, fields ...Field) {
-	all := append(slices.Clone(d.base), fields...)
-	d.logger.Println("DEBUG:", msg, flatten(all...))
-}
-func (d defaultLogger) Warn(msg string, fields ...Field) {
-	all := append(slices.Clone(d.base), fields...)
-	d.logger.Println("WARN:", msg, flatten(all...))
-}
-
-func flatten(fields ...zapcore.Field) string {
-	// assert types
-	enc := zapcore.NewMapObjectEncoder()
-	for _, f := range fields {
-		f.AddTo(enc)
-	}
-
-	if len(enc.Fields) == 0 {
-		return ""
-	}
-
-	pairs := make([]string, 0, len(fields))
-	for k, v := range enc.Fields {
-		pairs = append(pairs, fmt.Sprintf("%s=%v", k, v))
-	}
-	return strings.Join(pairs, ", ")
-}
-
-// context key type for carrying ZLogger
-type ctxKey struct{}
-
-// Attach returns a new context with the provided ZLogger.
-func Attach(ctx context.Context, lg ZLogger) context.Context {
-	return context.WithValue(ctx, ctxKey{}, lg)
-}
-
-// FromContext retrieves the ZLogger from ctx, or falls back to defaultLogger.
-func FromContext(ctx context.Context) ZLogger {
-	if lg, ok := ctx.Value(ctxKey{}).(ZLogger); ok && lg != nil {
-		return lg
-	}
-	return newDefaultLogger()
-}
-
-// noopLogger does absolutely nothing. For test only
-type noopLogger struct{}
-
-func (noopLogger) Info(msg string, _ ...Field)  {}
-func (noopLogger) Debug(msg string, _ ...Field) {}
-func (noopLogger) Error(msg string, _ ...Field) {}
-func (noopLogger) Warn(msg string, _ ...Field)  {}
-func (noopLogger) With(_ ...Field) ZLogger      { return noopLogger{} }
-func (noopLogger) Sync() error                  { return nil }
-
-var Discard ZLogger = noopLogger{}
-
-func detectAppName() string {
-	exe, err := os.Executable()
-	if err == nil {
-		return filepath.Base(exe)
-	}
-	return filepath.Base(os.Args[0])
-}
-
-//func _flatten(fields ...zapcore.Field) string {
-//	enc := zapcore.NewConsoleEncoder(zapcore.EncoderConfig{ConsoleSeparator: " "})
-//	buf, _ := enc.EncodeEntry(zapcore.Entry{}, fields)
-//	defer buf.Free()
-//	return strings.TrimSpace(buf.String())
-//}

@@ -13,14 +13,48 @@ import (
 	"time"
 )
 
+func TestZapRedirectOutput(t *testing.T) {
+	var buf bytes.Buffer
+	lg := New(&Config{ServiceName: "t", Format: ZLoggerJsonFormat})
+	restore := lg.RedirectOutput(&buf, zapcore.InfoLevel)
+	defer restore()
+
+	lg.Info("hello")
+	lg.Debug("hidden")
+
+	s := buf.String()
+	if !strings.Contains(s, "hello") || strings.Contains(s, "hidden") {
+		t.Fatalf("unexpected content: %q", s)
+	}
+}
+
+func TestDefaultRedirectOutputLevels(t *testing.T) {
+	infoBuf := &bytes.Buffer{}
+	errBuf := &bytes.Buffer{}
+	d := newDefaultLogger()
+
+	undoInfo := d.RedirectOutput(infoBuf, zapcore.InfoLevel)
+	undoErr := d.RedirectOutput(errBuf, zapcore.ErrorLevel)
+	defer undoInfo()
+	defer undoErr()
+
+	d.Info("i1")
+	d.Error("e1")
+
+	if !strings.Contains(infoBuf.String(), "INFO: i1") {
+		t.Fatal("info missing")
+	}
+	if !strings.Contains(errBuf.String(), "ERROR: e1") {
+		t.Fatal("error missing")
+	}
+}
+
 func TestStdLoggerAt_DefaultBackend_RoutesToError(t *testing.T) {
 	var buf bytes.Buffer
-	oldOut, oldFlags := log.Writer(), log.Flags()
-	log.SetOutput(&buf)
-	log.SetFlags(0)
-	defer func() { log.SetOutput(oldOut); log.SetFlags(oldFlags) }()
 
-	d := defaultLogger{logger: log.New(log.Default().Writer(), "", log.LstdFlags)}
+	d := newDefaultLogger()
+	restore := d.RedirectOutput(&buf, zapcore.ErrorLevel)
+	defer restore()
 	std := StdLoggerAt(d, zapcore.ErrorLevel)
 
 	std.Println("boom")
@@ -48,12 +82,10 @@ func TestStdLoggerAt_ZapBackend_NoPanic(t *testing.T) {
 
 func TestStdLoggerAt_DefaultBackend_RoutesToWarn(t *testing.T) {
 	var buf bytes.Buffer
-	oldOut, oldFlags := log.Writer(), log.Flags()
-	log.SetOutput(&buf)
-	log.SetFlags(0)
-	defer func() { log.SetOutput(oldOut); log.SetFlags(oldFlags) }()
 
-	d := defaultLogger{logger: log.New(log.Default().Writer(), "", log.LstdFlags)}
+	d := newDefaultLogger()
+	restore := d.RedirectOutput(&buf, zapcore.WarnLevel)
+	defer restore()
 	std := StdLoggerAt(d, zapcore.WarnLevel)
 
 	std.Println("heads up")
@@ -72,7 +104,7 @@ func TestNew_ProductionConfig(t *testing.T) {
 	}
 
 	logger := New(cfg)
-	if _, ok := logger.(*zapLogger); !ok {
+	if _, ok := logger.(*zLog); !ok {
 		t.Error("Expected zapLogger in production mode")
 	}
 }
@@ -85,7 +117,7 @@ func TestNew_DebugConfig(t *testing.T) {
 	}
 
 	logger := New(cfg)
-	if _, ok := logger.(*zapLogger); !ok {
+	if _, ok := logger.(*zLog); !ok {
 		t.Error("Expected zapLogger in debug mode")
 	}
 }
@@ -105,8 +137,8 @@ func TestNew_FallbackToDefault(t *testing.T) {
 	}
 
 	logger := New(cfg)
-	if _, ok := logger.(defaultLogger); !ok {
-		t.Error("Expecte default logger")
+	if _, ok := logger.(*defaultLogger); !ok {
+		t.Error("Expecte *default logger")
 	}
 }
 
@@ -123,8 +155,8 @@ func TestContextIntegration(t *testing.T) {
 func TestFromContext_NoLogger(t *testing.T) {
 	// Test empty context returns default logger
 	logger := FromContext(context.Background())
-	if _, ok := logger.(defaultLogger); !ok {
-		t.Error("Expected defaultLogger from empty context")
+	if _, ok := logger.(*defaultLogger); !ok {
+		t.Error("Expected *defaultLogger from empty context")
 	}
 }
 
@@ -133,7 +165,7 @@ func TestWithFields(t *testing.T) {
 	loggerWithFields := logger.With(String("key", "value"))
 
 	// Verify it returns the same type
-	if _, ok := loggerWithFields.(*zapLogger); !ok {
+	if _, ok := loggerWithFields.(*zLog); !ok {
 		t.Error("With() should return same logger type")
 	}
 }

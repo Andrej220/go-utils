@@ -1,24 +1,29 @@
 # zlog
 
-Minimal wrapper around Uber’s [`zap`](https://pkg.go.dev/go.uber.org/zap) that provides:
-- Interface: `ZLogger`
-- Dev/Prod presets (env-driven)
+Lightweight, production-ready logging library built on top of [Uber’s zap](https://pkg.go.dev/go.uber.org/zap).
+
+Provides:
+- Unified interface `ZLogger` for structured logs
+- Dev / Prod presets (`APP_DEBUG`, `LOG_FORMAT`)
 - JSON or console output
 - Context helpers (`Attach`, `FromContext`)
-- Safe fallback logger using stdlib `log` with flat `k=v` fields
-- `Discard` no-op logger for tests
+- Safe stdlib fallback (`defaultLogger`)
+- No-op logger (`Discard`)
+- Stdlog redirection (`RedirectStdLog`, `RedirectOutput`)
 
 ---
 
 ## Install
 
 ```bash
-go get github.com/Andrej220/go-utils/zlog
+go get github.com/azargarov/go-utils/zlog
 ```
 
 ```go
-import "github.com/Andrej220/go-utils/zlog"
+import "github.com/azargarov/go-utils/zlog"
 ```
+
+---
 
 ## Quick start
 
@@ -32,70 +37,73 @@ lg.Info("started",
 )
 ```
 
-### Custom config
+---
+
+## Config
 
 ```go
 cfg := &zlog.Config{
     ServiceName: "my-service",
-    Debug:       false,                       // or true
-    Format:      zlog.ZLoggerJsonFormat,      // or zlog.ZLoggerConsoleFormat
+    Debug:       false,
+    Format:      zlog.ZLoggerJsonFormat,
+    ForceStderr: false,
 }
 lg := zlog.New(cfg)
-defer lg.Sync()
 ```
 
-### Context usage
+Environment variables:
+
+| Variable | Values | Description |
+|-----------|---------|-------------|
+| `APP_DEBUG` | `true` / `1` | Enables dev mode |
+| `LOG_FORMAT` | `json` / `console` | Output format |
+
+---
+
+## Context helpers
 
 ```go
 ctx := zlog.Attach(context.Background(), lg)
-zlog.FromContext(ctx).Info("request",
-    zlog.String("path", "/health"),
-)
+zlog.FromContext(ctx).Info("req", zlog.String("path", "/health"))
 ```
+
+`FromContextDiscard()` returns a silent no-op logger.
+
+---
 
 ## Fields
 
-Typed helpers (recommended):
 ```go
 zlog.String("user", "alice")
 zlog.Int("age", 30)
 zlog.Bool("ok", true)
 zlog.Float64("score", 0.97)
-zlog.Time("at", time.Now())
 zlog.Error("err", err)
-zlog.Any("raw", map[string]any{"k":"v"}) // may be JSON-ish in console output
+zlog.Time("at", time.Now())
 ```
 
-## Formats
+---
 
-- `json` (default) — machine-friendly.
-- `console` — human-friendly (set `LOG_FORMAT=console`).
+## Stdlog redirection
 
-> The fallback stdlib logger prints fields as `key=value key2=value2` via an internal `flatten` helper.
+Redirect global `log` output:
 
-## Environment variables
-
-- `APP_DEBUG`: `true` / `1` ⇒ dev mode (higher verbosity).
-- `LOG_FORMAT`: `json` | `console`.
-
-`NewDefault()` reads both.
-
-## Testing
-
-No-op logger:
 ```go
-lg := zlog.Discard
-lg.Info("no output", zlog.String("k","v"))
+restore := lg.RedirectStdLog(zapcore.WarnLevel)
+defer restore()
+log.Println("stdlib message") // -> WARN in zlog
 ```
 
-Use your logger in tests:
+Redirect output to a custom writer:
+
 ```go
-func TestSomething(t *testing.T) {
-    lg := zlog.NewDefault("test")
-    defer lg.Sync()
-    // ...
-}
+f, _ := os.Create("/tmp/app.log")
+restore := lg.RedirectOutput(f, zapcore.InfoLevel)
+defer restore()
+lg.Info("written to /tmp/app.log")
 ```
+
+---
 
 ## Interface
 
@@ -107,11 +115,34 @@ type ZLogger interface {
     Warn(msg string, fields ...Field)
     With(fields ...Field) ZLogger
     Sync() error
+    RedirectStdLog(level zapcore.Level) (restore func())
+    RedirectOutput(w io.Writer, level zapcore.Level) (restore func())
 }
 ```
 
-## Notes
+---
 
-- `With(...)` attaches base fields; the fallback logger preserves them too.
+## Fallback safety
 
+If zap initialization fails, zlog falls back to a stdlib logger that prints
+flat `key=value` pairs and never panics.
 
+---
+
+## Example output
+
+**JSON**
+```json
+{"level":"info","timestamp":"2025-10-25T12:34:56Z","msg":"started","service":"my-service","port":8080}
+```
+
+**Console**
+```
+2025-10-25T12:34:56Z INFO started service=my-service port=8080
+```
+
+---
+
+## License
+
+MIT © Andrey Zargarov
